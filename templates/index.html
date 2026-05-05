@@ -2835,6 +2835,10 @@
             _audioUnlocked = true;
             document.removeEventListener('click', _unlockAudio, true);
             document.removeEventListener('touchstart', _unlockAudio, true);
+            // 브라우저 자동재생 정책 해제: 유효한 silent WAV 데이터 URI로 실제 잠금 해제
+            const sil = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+            sil.volume = 0;
+            sil.play().catch(() => {});
             // 잠금 해제 후 대기 중이던 소리 즉시 재생
             if (_pendingBeep) {
                 _pendingBeep = false;
@@ -3062,11 +3066,16 @@
                 audio.volume = soundVolume;
                 audio.play().catch(err => {
                     if (token !== beepPlayToken || beepAudio !== audio) return;
-                    console.warn("비프음 재생 실패(자동재생 차단 가능성):", err.name);
+                    console.warn("비프음 재생 실패:", err.name);
                     stopBeepLoop();
-                    // 자동재생 차단이면 첫 인터랙션 시 재시도
-                    if (!_audioUnlocked && err.name === 'NotAllowedError') {
+                    if (err.name === 'NotAllowedError') {
                         _pendingBeep = true;
+                        if (_audioUnlocked) {
+                            // 잠금 해제로 간주했으나 여전히 차단 → 다음 인터랙션에서 재시도
+                            _audioUnlocked = false;
+                            document.addEventListener('click', _unlockAudio, true);
+                            document.addEventListener('touchstart', _unlockAudio, true);
+                        }
                     }
                 });
             } catch (e) {
@@ -3112,9 +3121,14 @@
                 audio.play()
                     .then(() => console.log("팡파레 재생 성공"))
                     .catch(err => {
-                        console.warn("팡파레 재생 실패(자동재생 차단 가능성):", err.name);
-                        if (!_audioUnlocked && err.name === 'NotAllowedError') {
+                        console.warn("팡파레 재생 실패:", err.name);
+                        if (err.name === 'NotAllowedError') {
                             _pendingFanfare = true;
+                            if (_audioUnlocked) {
+                                _audioUnlocked = false;
+                                document.addEventListener('click', _unlockAudio, true);
+                                document.addEventListener('touchstart', _unlockAudio, true);
+                            }
                         }
                     });
             } catch (e) {
@@ -3719,7 +3733,7 @@
                                 window._winnerDisplayed = true;
                                 winnerOverlay.style.animation = 'winner-popup 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
                                 console.log('애니메이션 종료 후 즉시 당첨 발표:', winnerName);
-                                playFanfareOncePerRound(window.animationInfo.roundId || '', 'local-animate-end');
+                                // 팡파레는 play_fanfare 소켓 이벤트가 단독 처리 (타이밍 일관성)
                             }
 
                             // update_participants가 update_winner보다 먼저 도착해도
@@ -3764,7 +3778,7 @@
                             winnerOverlay.style.display = 'block';
                             window._winnerDisplayed = true;
                             winnerOverlay.style.animation = 'winner-popup 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
-                            playFanfareOncePerRound(window.animationInfo.roundId || '', 'local-backup-timer');
+                            // 팡파레는 play_fanfare 소켓 이벤트가 단독 처리 (타이밍 일관성)
                         }
 
                         // 백업 타이머 경로도 동일하게 체크 유지 보류를 먼저 건다.
@@ -3781,6 +3795,11 @@
             });
 
             socket.on('update_winner', function (data) {
+                // 이전 라운드의 지연 도착 이벤트가 현재 라운드 효과음을 끊는 것을 방지
+                const _uwIncoming = data && data.round_id ? String(data.round_id) : '';
+                const _uwActive   = window.animationInfo ? String(window.animationInfo.roundId || '') : '';
+                const _uwStale    = _uwIncoming && _uwActive && (_uwIncoming !== _uwActive) && gameIsActive;
+
                 if (data && data.round_id) {
                     currentRoundId = String(data.round_id);
                 }
@@ -3794,7 +3813,7 @@
                 gameIsActive = false; // 게임 종료 → 이제 자동 새로고침 허용
                 window._gameIsActive = false;
                 setSoundProfileDisabled(false);
-                stopAllSounds();
+                if (!_uwStale) stopAllSounds(); // 지연 이벤트면 현재 라운드 소리 보호
 
                 // [추가] 당첨자 결정 시 사은품 강조 효과 제거
                 const allPrizeItems = document.querySelectorAll('.prize-item');
@@ -3902,11 +3921,8 @@
                 }
 
                 stopBeepLoop();
-
-                setTimeout(() => {
-                    // 이미 위에서 lastFanfareRoundId를 세팅했으므로 playFanfareOncePerRound 대신 직접 재생
-                    playFanfare();
-                }, 100);
+                // 비프 정지 후 즉시 팡파레 (100ms 지연 제거 — 소켓이 단일 경로)
+                playFanfare();
             });
 
             socket.on('error', function (data) {
