@@ -309,9 +309,8 @@
             width: 600px;
             height: 600px;
             flex: 0 0 600px;
-            overflow: visible;
+            overflow: hidden;
             background-color: transparent;
-            /* 디버깅용 배경색 추가 */
         }
 
         #rotating-container {
@@ -700,7 +699,7 @@
 
         #winner-overlay {
             display: none;
-            position: fixed;
+            position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
@@ -2966,6 +2965,8 @@
             if (!Object.prototype.hasOwnProperty.call(BEEP_SOUND_OPTIONS, key)) key = DEFAULT_BEEP_SOUND_KEY;
             currentBeepProfileKey = key;
             beepSound = BEEP_SOUND_OPTIONS[key];
+            // 선택된 효과음 파일 즉시 프리패치 (재생 시 지연 없도록)
+            if (beepSound) fetch(beepSound, { cache: 'force-cache' }).catch(function () {});
             var sel = document.getElementById('sound-profile');
             if (sel && sel.value !== key) sel.value = key;
             if (persist) {
@@ -3101,6 +3102,11 @@
                 try { return localStorage.getItem(SOUND_PROFILE_STORAGE_KEY) || DEFAULT_BEEP_SOUND_KEY; } catch (e) { return DEFAULT_BEEP_SOUND_KEY; }
             })(), false);
             fanfareSound = '/static/fanfare.mp3';
+
+            // 페이지 로드 시 미리 다운로드 → play_beep 도착 즉시 재생 가능 (지연 방지)
+            [beepSound, fanfareSound].forEach(function (url) {
+                if (url) fetch(url, { cache: 'force-cache' }).catch(function () {});
+            });
 
             console.log("소리 파일 설정 완료:", {
                 비프음: beepSound,
