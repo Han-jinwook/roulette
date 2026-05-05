@@ -1003,7 +1003,11 @@ def handle_confirm_winner(data=None):
                 games['global_game']['confirmed'] = True
                 
         print(f"DEBUG: 확정된 당첨자: {winner}")
-        
+
+        # 팡파레는 DB 저장 전에 즉시 전송 (DB 지연과 무관하게 바로 들리도록)
+        early_round_id = emit_round_id or (str(game_obj.get('round_id') or '') if game_obj else '')
+        socketio.emit('play_fanfare', {'round_id': early_round_id}, namespace='/')
+
         print(f"DEBUG: 당첨자 확정: {winner} (현재 active URL에 저장 시도)")
         
         try:
@@ -1144,7 +1148,6 @@ def handle_confirm_winner(data=None):
             emit_round_id = str(game_obj.get('round_id') or '')
         # 당첨자 정보 전송
         socketio.emit('update_winner', {'winner': winner, 'round_id': emit_round_id}, namespace='/')
-        socketio.emit('play_fanfare', {'round_id': emit_round_id}, namespace='/')
 
         # [추가] 당첨자 확정 타임스탬프 저장 (10초 대기 로직용)
         try:

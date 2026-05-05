@@ -3637,10 +3637,14 @@
                 document.getElementById('congratulation').style.display = 'none';
                 document.getElementById('winner').innerText = '';
 
-                startCountdown(duration);
+                // 카운트다운도 targetUnixMs 기준으로 맞춤 (원판 멈춤과 동일 기준)
+                startCountdown(targetUnixMs > 0 ? (targetUnixMs - Date.now()) / 1000 : duration);
 
                 const startTime = Date.now();
-                const totalDuration = duration * 1000;
+                // 진행 progress 계산에 쓸 totalDuration: targetUnixMs 기준이 있으면 그걸로
+                const totalDuration = targetUnixMs > 0
+                    ? Math.max(50, targetUnixMs - startTime)
+                    : duration * 1000;
 
                 window.animationInfo = {
                     duration,
@@ -3649,7 +3653,7 @@
                     winner,
                     roundId: data.round_id || '',
                     startTime,
-                    endTime: startTime + totalDuration
+                    endTime: targetUnixMs > 0 ? targetUnixMs : startTime + totalDuration
                 };
 
                 let animationFrameId = null;
@@ -3659,7 +3663,9 @@
                     const now = Date.now();
                     const elapsed = now - startTime;
 
-                    if (elapsed >= totalDuration) {
+                    // [핵심 수정] 카운트다운과 같은 절대 시각 기준으로 멈춤
+                    const shouldStop = targetUnixMs > 0 ? (now >= targetUnixMs) : (elapsed >= totalDuration);
+                    if (shouldStop) {
                         if (!animationCompleted) {
                             animationCompleted = true;
 
@@ -3741,7 +3747,7 @@
 
                         console.log('백업 타이머로 애니메이션 종료');
                     }
-                }, totalDuration + 50); // [최적화] 여유 시간을 100ms -> 50ms로 단축
+                }, targetUnixMs > 0 ? Math.max(50, targetUnixMs - Date.now() + 50) : totalDuration + 50);
             });
 
             socket.on('update_winner', function (data) {
