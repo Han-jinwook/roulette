@@ -2882,32 +2882,6 @@
         let soundVolume = 0.8;
         let currentRoundId = '';
         let lastFanfareRoundId = '';
-        let _audioUnlocked = false;
-        let _pendingBeep = false;
-        let _pendingFanfare = false;
-
-        function _unlockAudio() {
-            if (_audioUnlocked) return;
-            _audioUnlocked = true;
-            document.removeEventListener('click', _unlockAudio, true);
-            document.removeEventListener('touchstart', _unlockAudio, true);
-            // 브라우저 자동재생 정책 해제: 유효한 silent WAV 데이터 URI로 실제 잠금 해제
-            const sil = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
-            sil.volume = 0;
-            sil.play().catch(() => {});
-            // 잠금 해제 후 대기 중이던 소리 즉시 재생
-            if (_pendingBeep) {
-                _pendingBeep = false;
-                startBeepLoop();
-            }
-            if (_pendingFanfare) {
-                _pendingFanfare = false;
-                playFanfare();
-            }
-        }
-        document.addEventListener('click', _unlockAudio, true);
-        document.addEventListener('touchstart', _unlockAudio, true);
-        window._unlockAudio = _unlockAudio;
         const SOUND_VOLUME_STORAGE_KEY = 'roulette_sound_volume';
         const SOUND_PROFILE_STORAGE_KEY = 'roulette_sound_profile';
         const BEEP_SOUND_OPTIONS = (function () {
@@ -3131,15 +3105,6 @@
                     if (token !== beepPlayToken || beepAudio !== audio) return;
                     console.warn("비프음 재생 실패:", err.name);
                     stopBeepLoop();
-                    if (err.name === 'NotAllowedError') {
-                        _pendingBeep = true;
-                        if (_audioUnlocked) {
-                            // 잠금 해제로 간주했으나 여전히 차단 → 다음 인터랙션에서 재시도
-                            _audioUnlocked = false;
-                            document.addEventListener('click', _unlockAudio, true);
-                            document.addEventListener('touchstart', _unlockAudio, true);
-                        }
-                    }
                 });
             } catch (e) {
                 console.error("비프음 시작 중 오류:", e);
@@ -3185,14 +3150,6 @@
                     .then(() => console.log("팡파레 재생 성공"))
                     .catch(err => {
                         console.warn("팡파레 재생 실패:", err.name);
-                        if (err.name === 'NotAllowedError') {
-                            _pendingFanfare = true;
-                            if (_audioUnlocked) {
-                                _audioUnlocked = false;
-                                document.addEventListener('click', _unlockAudio, true);
-                                document.addEventListener('touchstart', _unlockAudio, true);
-                            }
-                        }
                     });
             } catch (e) {
                 console.error("팡파레 재생 중 오류:", e);
