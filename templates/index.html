@@ -1165,6 +1165,14 @@
                 max-width: min(100%, 420px);
                 flex: 0 1 auto;
                 min-width: 0;
+                max-height: 600px;
+                overflow-y: auto;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+
+            #all-participants-container::-webkit-scrollbar {
+                display: none;
             }
 
             #prize-right-col {
