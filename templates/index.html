@@ -418,8 +418,6 @@
                 margin-top: 14px;
                 width: min(100%, 600px);
                 max-width: 100%;
-                max-height: 420px;
-                overflow-y: auto;
             }
 
             #prize-right-col {
@@ -702,7 +700,7 @@
 
         #winner-overlay {
             display: none;
-            position: absolute;
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
@@ -1159,20 +1157,28 @@
             max-width: 460px;
         }
 
-        /* 데스크톱(1201px+): 이 블록을 스타일 맨 끄트머리에 둬서 #prize-list/#memo·컨테이너 base보다 우선 — html만 세로 스크롤, 이중 막대 완화 */
+        @keyframes participantScrollUp {
+            from { transform: translateY(0); }
+            to   { transform: translateY(-50%); }
+        }
+
+        /* 데스크톱(1201px+): overflow:hidden으로 브라우저 스크롤바 이슈 완전 차단 */
         @media (min-width: 1201px) {
             #all-participants-container {
                 max-width: min(100%, 420px);
                 flex: 0 1 auto;
                 min-width: 0;
-                max-height: 600px;
-                overflow-y: auto;
-                scrollbar-width: none;
-                -ms-overflow-style: none;
+                overflow: hidden;
             }
 
-            #all-participants-container::-webkit-scrollbar {
-                display: none;
+            #all-participants-scroll-track {
+                height: 560px;
+                overflow: hidden;
+                position: relative;
+            }
+
+            #all-participants-scroll-inner {
+                will-change: transform;
             }
 
             #prize-right-col {
@@ -1318,20 +1324,24 @@
                     참가명단 (티켓 수)
                 </strong>
             </div>
-            {% if allowed_info %}
-            {% for info in allowed_info %}
-            <div class="all-participant-item {% if info.is_confirmed %}is-confirmed{% endif %}">
-                {% if info.is_confirmed %}
-                <span class="confirmed-badge">✅</span>
-                {% else %}
-                <span class="confirmed-badge" style="visibility:hidden;">✅</span>
-                {% endif %}
-                <span class="p-name">{{ info.name }}</span> <span class="p-tickets">({{ info.tickets }}장)</span>
+            <div id="all-participants-scroll-track">
+                <div id="all-participants-scroll-inner">
+                    {% if allowed_info %}
+                    {% for info in allowed_info %}
+                    <div class="all-participant-item {% if info.is_confirmed %}is-confirmed{% endif %}">
+                        {% if info.is_confirmed %}
+                        <span class="confirmed-badge">✅</span>
+                        {% else %}
+                        <span class="confirmed-badge" style="visibility:hidden;">✅</span>
+                        {% endif %}
+                        <span class="p-name">{{ info.name }}</span> <span class="p-tickets">({{ info.tickets }}장)</span>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="participants-empty" style="color:#999; font-size:0.9em;">참여 명단이 없습니다.</div>
+                    {% endif %}
+                </div>
             </div>
-            {% endfor %}
-            {% else %}
-            <div style="color:#999; font-size:0.9em;">참여 명단이 없습니다.</div>
-            {% endif %}
         </div>
 
         <!-- 사은품 목록 (오른쪽으로 이동) -->
@@ -1817,6 +1827,7 @@
         function opRenderParticipantsListFromAllowed(allowedPairs, confirmedSet) {
             var allContainer = document.getElementById('all-participants-container');
             if (!allContainer) return;
+            var scrollInner = document.getElementById('all-participants-scroll-inner') || allContainer;
             Array.prototype.slice.call(allContainer.querySelectorAll('.all-participant-item, .participant-separator, .participants-empty')).forEach(function (el) {
                 if (el && el.parentNode) el.parentNode.removeChild(el);
             });
@@ -1825,7 +1836,8 @@
                 empty.className = 'participants-empty';
                 empty.style.cssText = 'color:#999; font-size:0.9em;';
                 empty.textContent = '참여 명단이 없습니다.';
-                allContainer.appendChild(empty);
+                scrollInner.appendChild(empty);
+                if (typeof initParticipantAutoScroll === 'function') initParticipantAutoScroll();
                 return;
             }
             function appendRow(row, isConfirmed) {
@@ -1844,13 +1856,14 @@
                 item.appendChild(badge);
                 item.appendChild(nameSpan);
                 item.appendChild(ticketSpan);
-                allContainer.appendChild(item);
+                scrollInner.appendChild(item);
             }
             allowedPairs.forEach(function (row) {
                 var nm = row[0];
                 var isConfirmed = !!(confirmedSet && confirmedSet.has(nm));
                 appendRow(row, isConfirmed);
             });
+            if (typeof initParticipantAutoScroll === 'function') initParticipantAutoScroll();
         }
         function opApplySelectedEventToLivePanels(d) {
             if (!d) return;
@@ -2817,6 +2830,50 @@
         }
 
         // 오디오 관련 변수
+        // ── 명단 무한 루프 자동스크롤 (데스크톱 전용) ──────────────────────────
+        function initParticipantAutoScroll() {
+            var track = document.getElementById('all-participants-scroll-track');
+            var inner = document.getElementById('all-participants-scroll-inner');
+            if (!track || !inner) return;
+
+            // 이전 클론 제거 후 애니메이션 리셋
+            Array.prototype.slice.call(inner.querySelectorAll('.scroll-clone')).forEach(function (el) {
+                el.parentNode.removeChild(el);
+            });
+            inner.style.animation = 'none';
+            inner.style.transform = 'translateY(0)';
+
+            // 데스크톱(1201px+)에서만 자동스크롤
+            if (window.innerWidth < 1201) return;
+
+            var originalItems = Array.prototype.slice.call(inner.children);
+            if (!originalItems.length) return;
+
+            requestAnimationFrame(function () {
+                var originalHeight = inner.scrollHeight;
+                var trackHeight = track.clientHeight || 560;
+
+                if (originalHeight <= trackHeight) return; // 명단이 박스보다 짧으면 불필요
+
+                // 원본 복제 → seamless loop
+                originalItems.forEach(function (item) {
+                    var clone = item.cloneNode(true);
+                    clone.classList.add('scroll-clone');
+                    inner.appendChild(clone);
+                });
+
+                // 35px/s (느린 속도)
+                var duration = (originalHeight / 35).toFixed(1);
+                inner.style.animation = 'participantScrollUp ' + duration + 's linear infinite';
+            });
+        }
+        window.initParticipantAutoScroll = initParticipantAutoScroll;
+        window.addEventListener('resize', function () {
+            clearTimeout(window._participantScrollResizeTimer);
+            window._participantScrollResizeTimer = setTimeout(initParticipantAutoScroll, 300);
+        });
+        // ──────────────────────────────────────────────────────────────────────
+
         let beepSound = null;
         let fanfareSound = null;
         let beepLoopInterval = null;
@@ -3438,6 +3495,7 @@
 
             loadSounds();
             initSoundControls();
+            initParticipantAutoScroll();
 
             try {
                 initChart();
@@ -4334,6 +4392,7 @@
             function syncDomParticipantList(nameTicketPairs, confirmedAll) {
                 var allContainer = document.getElementById('all-participants-container');
                 if (!allContainer) return;
+                var scrollInner = document.getElementById('all-participants-scroll-inner') || allContainer;
                 var confirmedSet = confirmedAll ? new Set(confirmedAll) : null;
                 Array.prototype.slice.call(allContainer.querySelectorAll('.all-participant-item, .participant-separator, .participants-empty')).forEach(function (el) {
                     if (el && el.parentNode) el.parentNode.removeChild(el);
@@ -4343,11 +4402,12 @@
                     empty.className = 'participants-empty';
                     empty.style.cssText = 'color:#999; font-size:0.9em;';
                     empty.textContent = '참여 명단이 없습니다.';
-                    allContainer.appendChild(empty);
+                    scrollInner.appendChild(empty);
                     var cntEl0 = document.getElementById('participants-total-count');
                     if (cntEl0) cntEl0.textContent = '0';
                     var opCntEl0 = document.getElementById('op-allowed-count');
                     if (opCntEl0) opCntEl0.textContent = '0명';
+                    if (typeof initParticipantAutoScroll === 'function') initParticipantAutoScroll();
                     return;
                 }
                 function appendRow(row, isC) {
@@ -4366,7 +4426,7 @@
                     item.appendChild(badge);
                     item.appendChild(nameSpan);
                     item.appendChild(ticketSpan);
-                    allContainer.appendChild(item);
+                    scrollInner.appendChild(item);
                 }
                 nameTicketPairs.forEach(function (row) {
                     var nm = Array.isArray(row) ? row[0] : (row && row.name);
@@ -4376,6 +4436,7 @@
                 });
                 var cntEl = document.getElementById('participants-total-count');
                 if (cntEl) cntEl.textContent = String(nameTicketPairs.length);
+                if (typeof initParticipantAutoScroll === 'function') initParticipantAutoScroll();
             }
             window.syncDomParticipantList = syncDomParticipantList;
 
