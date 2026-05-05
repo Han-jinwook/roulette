@@ -1279,7 +1279,6 @@
                     <span id="guest-current-time" class="time-value" style="font-weight: bold;"></span>
                 </div>
                 </div>
-                <div id="sound-unlock-toast" onclick="window._unlockAudio && window._unlockAudio()" style="cursor:pointer;background:#1565c0;color:#fff;padding:4px 14px;border-radius:20px;font-size:13px;display:inline-block;margin-bottom:6px;user-select:none;">🔊 탭하여 효과음 켜기</div>
                 <div id="guest-sound-controls">
                     <span id="guest-sound-label">효과음 줄이기</span>
                     <input type="range" id="guest-sound-volume" min="0" max="100" step="1" value="80">
@@ -2828,16 +2827,23 @@
         let currentRoundId = '';
         let lastFanfareRoundId = '';
         let _audioUnlocked = false;
+        let _pendingBeep = false;
+        let _pendingFanfare = false;
 
         function _unlockAudio() {
             if (_audioUnlocked) return;
             _audioUnlocked = true;
             document.removeEventListener('click', _unlockAudio, true);
             document.removeEventListener('touchstart', _unlockAudio, true);
-            const sil = new Audio();
-            sil.play().catch(() => {});
-            const toast = document.getElementById('sound-unlock-toast');
-            if (toast) toast.style.display = 'none';
+            // 잠금 해제 후 대기 중이던 소리 즉시 재생
+            if (_pendingBeep) {
+                _pendingBeep = false;
+                startBeepLoop();
+            }
+            if (_pendingFanfare) {
+                _pendingFanfare = false;
+                playFanfare();
+            }
         }
         document.addEventListener('click', _unlockAudio, true);
         document.addEventListener('touchstart', _unlockAudio, true);
@@ -3056,9 +3062,12 @@
                 audio.volume = soundVolume;
                 audio.play().catch(err => {
                     if (token !== beepPlayToken || beepAudio !== audio) return;
-                    console.error("비프음 재생 실패:", err);
-                    // 자동 기본 beep 폴백은 중복음 오해를 유발할 수 있어 제거
+                    console.warn("비프음 재생 실패(자동재생 차단 가능성):", err.name);
                     stopBeepLoop();
+                    // 자동재생 차단이면 첫 인터랙션 시 재시도
+                    if (!_audioUnlocked && err.name === 'NotAllowedError') {
+                        _pendingBeep = true;
+                    }
                 });
             } catch (e) {
                 console.error("비프음 시작 중 오류:", e);
@@ -3102,7 +3111,12 @@
                 audio.volume = soundVolume;
                 audio.play()
                     .then(() => console.log("팡파레 재생 성공"))
-                    .catch(err => console.error("팡파레 재생 실패:", err));
+                    .catch(err => {
+                        console.warn("팡파레 재생 실패(자동재생 차단 가능성):", err.name);
+                        if (!_audioUnlocked && err.name === 'NotAllowedError') {
+                            _pendingFanfare = true;
+                        }
+                    });
             } catch (e) {
                 console.error("팡파레 재생 중 오류:", e);
             }
