@@ -1279,6 +1279,7 @@
                     <span id="guest-current-time" class="time-value" style="font-weight: bold;"></span>
                 </div>
                 </div>
+                <div id="sound-unlock-toast" onclick="window._unlockAudio && window._unlockAudio()" style="cursor:pointer;background:#1565c0;color:#fff;padding:4px 14px;border-radius:20px;font-size:13px;display:inline-block;margin-bottom:6px;user-select:none;">🔊 탭하여 효과음 켜기</div>
                 <div id="guest-sound-controls">
                     <span id="guest-sound-label">효과음 줄이기</span>
                     <input type="range" id="guest-sound-volume" min="0" max="100" step="1" value="80">
@@ -2826,6 +2827,21 @@
         let soundVolume = 0.8;
         let currentRoundId = '';
         let lastFanfareRoundId = '';
+        let _audioUnlocked = false;
+
+        function _unlockAudio() {
+            if (_audioUnlocked) return;
+            _audioUnlocked = true;
+            document.removeEventListener('click', _unlockAudio, true);
+            document.removeEventListener('touchstart', _unlockAudio, true);
+            const sil = new Audio();
+            sil.play().catch(() => {});
+            const toast = document.getElementById('sound-unlock-toast');
+            if (toast) toast.style.display = 'none';
+        }
+        document.addEventListener('click', _unlockAudio, true);
+        document.addEventListener('touchstart', _unlockAudio, true);
+        window._unlockAudio = _unlockAudio;
         const SOUND_VOLUME_STORAGE_KEY = 'roulette_sound_volume';
         const SOUND_PROFILE_STORAGE_KEY = 'roulette_sound_profile';
         const BEEP_SOUND_OPTIONS = (function () {
@@ -3874,7 +3890,8 @@
                 stopBeepLoop();
 
                 setTimeout(() => {
-                    playFanfareOncePerRound(incomingRoundId, 'socket-event');
+                    // 이미 위에서 lastFanfareRoundId를 세팅했으므로 playFanfareOncePerRound 대신 직접 재생
+                    playFanfare();
                 }, 100);
             });
 
