@@ -927,7 +927,10 @@ def handle_start_rotation(data):
     # 이 부분 추가: 게임 정보를 'global_game' 키에 복사
     games['global_game'] = game.copy()
     
-    # 클라이언트에게 모든 정보를 한 번에 전송
+    # 클라이언트에게 모든 정보를 한 번에 전송 ([ROUND_START] 교차검증용 로그 — emit 페이로드 시각과 동일 스냅샷)
+    _start_game_sent_ms = int(time.time() * 1000)
+    _start_game_target_ms = int((time.time() + max(0.0, duration)) * 1000)
+    print(f"DEBUG: [start_game emit] kind=broadcast round_id={round_id} sent_unix_ms={_start_game_sent_ms}")
     socketio.emit('start_game', {
         'duration': duration,
         'finalAngle': final_angle,
@@ -935,8 +938,8 @@ def handle_start_rotation(data):
         'round_id': round_id,
         'sound_profile': selected_sound_profile,
         # [VIBE RULE] 클라이언트가 수신 지연(ms)을 계산하는 기준 시각 (동적 보정용)
-        'sent_unix_ms': int(time.time() * 1000),
-        'target_unix_ms': int((time.time() + max(0.0, duration)) * 1000),
+        'sent_unix_ms': _start_game_sent_ms,
+        'target_unix_ms': _start_game_target_ms,
         'participants': p_list # 정확한 명단 동기화
     }, namespace='/')
         
@@ -1351,15 +1354,20 @@ def handle_request_game_status():
             )
             
             # 진행 중인 게임이 있으므로 start_game 이벤트도 전송
+            _sg_sent_ms = int(time.time() * 1000)
+            _sg_target_ms = int((time.time() + max(0.0, duration_left)) * 1000)
+            _sg_rid = active_game.get('round_id', '')
+            _sid_short = (sid[:12] + '…') if len(sid) > 12 else (sid or '(none)')
+            print(f"DEBUG: [start_game emit] kind=resync sid={_sid_short} round_id={_sg_rid} sent_unix_ms={_sg_sent_ms}")
             socketio.emit('start_game', {
                 'duration': duration_left,
                 'finalAngle': active_game.get('current_angle', 0),
                 'winner': active_game.get('final_winner'),
-                'round_id': active_game.get('round_id', ''),
+                'round_id': _sg_rid,
                 'sound_profile': active_game.get('sound_profile', ''),
                 # [VIBE RULE] 요청-응답 지연 측정 기준값 (브라우저별 동적 시간보정 공통)
-                'sent_unix_ms': int(time.time() * 1000),
-                'target_unix_ms': int((time.time() + max(0.0, duration_left)) * 1000),
+                'sent_unix_ms': _sg_sent_ms,
+                'target_unix_ms': _sg_target_ms,
             }, namespace='/', to=request.sid)  # 요청한 클라이언트에게만 전송
             
             print(f"진행 중인 게임 정보 전송: 남은 시간 {duration_left:.2f}초")
