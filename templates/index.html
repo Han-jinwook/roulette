@@ -2958,6 +2958,9 @@
         let fanfareSound = null;
         let beepLoopInterval = null;
         let beepAudio = null;
+        let fanfareAudioEl = null;
+        var beepAudioSrcApplied = '';
+        var fanfareAudioSrcApplied = '';
         let beepPlayToken = 0; // 지연된 오디오 콜백이 최신 재생 상태를 덮지 않도록 보호
         let currentBeepProfileKey = '';
         let soundVolume = 0.8;
@@ -3149,6 +3152,83 @@
             return colors;
         }
 
+        /** iPhone/iPad(WebKit): 소켓 타이밍 play() 실패·한 번만 재생되는 현상 완화용 */
+        function isIosLikeBrowser() {
+            try {
+                var ua = navigator.userAgent || '';
+                if (/iPad|iPhone|iPod/i.test(ua)) return true;
+                if (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1) return true;
+            } catch (e) {}
+            return false;
+        }
+
+        function ensureBeepAudio() {
+            if (!beepSound) return null;
+            if (!beepAudio) {
+                beepAudio = new Audio();
+                try { beepAudio.preload = 'auto'; } catch (e2) {}
+            }
+            if (beepAudioSrcApplied !== beepSound) {
+                try {
+                    beepAudio.pause();
+                    beepAudio.src = beepSound;
+                    beepAudio.load();
+                    beepAudioSrcApplied = beepSound;
+                } catch (e3) {}
+            }
+            return beepAudio;
+        }
+
+        function ensureFanfareAudio() {
+            if (!fanfareSound) return null;
+            if (!fanfareAudioEl) {
+                fanfareAudioEl = new Audio();
+                try { fanfareAudioEl.preload = 'auto'; } catch (e2) {}
+            }
+            if (fanfareAudioSrcApplied !== fanfareSound) {
+                try {
+                    fanfareAudioEl.pause();
+                    fanfareAudioEl.src = fanfareSound;
+                    fanfareAudioEl.load();
+                    fanfareAudioSrcApplied = fanfareSound;
+                } catch (e3) {}
+            }
+            return fanfareAudioEl;
+        }
+
+        function setupRouletteIosAudioUnlock() {
+            if (!isIosLikeBrowser()) return;
+            if (window._rouletteIosUnlockBound) return;
+            window._rouletteIosUnlockBound = true;
+            var unlock = function () {
+                if (window._rouletteAudioUnlockDone) return;
+                try {
+                    var a = ensureBeepAudio();
+                    if (!a) return;
+                    var prevLoop = a.loop;
+                    var prevVol = a.volume;
+                    a.loop = false;
+                    a.volume = 0.01;
+                    var p = a.play();
+                    if (p && typeof p.then === 'function') {
+                        p.then(function () {
+                            window._rouletteAudioUnlockDone = true;
+                            try {
+                                a.pause();
+                                a.currentTime = 0;
+                                a.volume = typeof prevVol === 'number' ? prevVol : soundVolume;
+                                a.loop = prevLoop;
+                            } catch (e4) {}
+                        }).catch(function () {});
+                    } else {
+                        window._rouletteAudioUnlockDone = true;
+                    }
+                } catch (e) {}
+            };
+            document.addEventListener('touchstart', unlock, { passive: true, capture: true });
+            document.addEventListener('click', unlock, { capture: true });
+        }
+
         // 오디오 파일 로딩 및 준비
         function loadSounds() {
             console.log("오디오 파일 로딩 시도");
@@ -3177,9 +3257,8 @@
             console.log("비프음 재생 시작");
 
             try {
-                const selectedSound = beepSound;
-                const audio = new Audio(selectedSound);
-                beepAudio = audio;
+                var audio = ensureBeepAudio();
+                if (!audio) return;
                 audio.loop = true;
                 audio.volume = soundVolume;
                 audio.play().catch(err => {
@@ -3201,9 +3280,8 @@
                 try {
                     beepAudio.pause();
                     beepAudio.currentTime = 0;
-                    beepAudio.src = '';
-                    beepAudio.load();
-                    beepAudio = null;
+                    beepAudio.loop = false;
+                    // WebKit/iOS: src 비우기 후 소켓 타이밍 재생이 막히는 경우가 있어 요소·src 유지
                 } catch (e) {
                     console.error("비프음 중지 중 오류:", e);
                 }
@@ -3225,8 +3303,11 @@
             console.log("팡파레 재생, 소리 파일:", fanfareSound);
 
             try {
-                const audio = new Audio(fanfareSound);
+                var audio = ensureFanfareAudio();
+                if (!audio) return;
+                audio.loop = false;
                 audio.volume = soundVolume;
+                audio.currentTime = 0;
                 audio.play()
                     .then(() => console.log("팡파레 재생 성공"))
                     .catch(err => {
@@ -3538,6 +3619,7 @@
             stopAllSounds();
 
             loadSounds();
+            setupRouletteIosAudioUnlock();
             initSoundControls();
             initParticipantAutoScroll();
 
