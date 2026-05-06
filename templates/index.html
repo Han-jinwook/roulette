@@ -3745,14 +3745,37 @@
                 document.getElementById('congratulation').style.display = 'none';
                 document.getElementById('winner').innerText = '';
 
-                // 카운트다운도 targetUnixMs 기준으로 맞춤 (원판 멈춤과 동일 기준)
-                startCountdown(targetUnixMs > 0 ? (targetUnixMs - Date.now()) / 1000 : duration);
-
                 const startTime = Date.now();
-                // 진행 progress 계산에 쓸 totalDuration: targetUnixMs 기준이 있으면 그걸로
-                const totalDuration = targetUnixMs > 0
-                    ? Math.max(50, targetUnixMs - startTime)
-                    : duration * 1000;
+                // 늦게 도착한 start_game: 서버 target이 이미 임박/과거여도 최소 가시 회전 보장
+                // (ROULETTE_* 고정 상수와 별개인 수신 지연 UX 바닥 — 동적 보정 원칙 유지)
+                const durMs = Math.max(50, duration * 1000);
+                const MIN_LATE_SPIN_MS = 750;
+                let stopAtUnixMs;
+                let totalDuration;
+                if (targetUnixMs > 0) {
+                    const serverRemainMs = targetUnixMs - startTime;
+                    if (serverRemainMs >= MIN_LATE_SPIN_MS) {
+                        stopAtUnixMs = targetUnixMs;
+                        totalDuration = serverRemainMs;
+                    } else {
+                        const floorMs = Math.max(MIN_LATE_SPIN_MS, durMs * 0.35);
+                        stopAtUnixMs = startTime + floorMs;
+                        totalDuration = floorMs;
+                        if (DEBUG_TIMING_LOG) {
+                            console.log('[timing-debug][start_game late-spin]', {
+                                serverRemainMs: serverRemainMs,
+                                floorMs: floorMs,
+                                durMs: durMs
+                            });
+                        }
+                    }
+                } else {
+                    totalDuration = durMs;
+                    stopAtUnixMs = startTime + totalDuration;
+                }
+
+                // 카운트다운: 실제 멈춤 시각(stopAtUnixMs)과 동일 축 (늦은 수신 시에도 0으로 즉시 붕괴하지 않음)
+                startCountdown(Math.max(0, (stopAtUnixMs - Date.now()) / 1000));
 
                 window.animationInfo = {
                     duration,
@@ -3761,7 +3784,7 @@
                     winner,
                     roundId: data.round_id || '',
                     startTime,
-                    endTime: targetUnixMs > 0 ? targetUnixMs : startTime + totalDuration
+                    endTime: stopAtUnixMs
                 };
 
                 let animationFrameId = null;
@@ -3771,8 +3794,8 @@
                     const now = Date.now();
                     const elapsed = now - startTime;
 
-                    // [핵심 수정] 카운트다운과 같은 절대 시각 기준으로 멈춤
-                    const shouldStop = targetUnixMs > 0 ? (now >= targetUnixMs) : (elapsed >= totalDuration);
+                    // 멈춤: 서버 수신이 늦었을 때는 stopAtUnixMs로 최소 회전 후 종료
+                    const shouldStop = now >= stopAtUnixMs;
                     if (shouldStop) {
                         if (!animationCompleted) {
                             animationCompleted = true;
@@ -3855,7 +3878,7 @@
 
                         console.log('백업 타이머로 애니메이션 종료');
                     }
-                }, targetUnixMs > 0 ? Math.max(50, targetUnixMs - Date.now() + 50) : totalDuration + 50);
+                }, Math.max(50, stopAtUnixMs - Date.now() + 50));
             });
 
             socket.on('update_winner', function (data) {
