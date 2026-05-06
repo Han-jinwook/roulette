@@ -1186,6 +1186,12 @@
             to   { transform: translateY(-50%); }
         }
 
+        /* 룰렛 회전 중·탭 비가시: 무한 롤 일시정지(저사양 탭에서 회전 애니메이션과 동시 구동 시 부하 완화) */
+        #all-participants-scroll-inner.participant-marquee-paused {
+            animation-play-state: paused !important;
+            will-change: auto;
+        }
+
         /* 데스크톱(1201px+): overflow:hidden으로 브라우저 스크롤바 이슈 완전 차단 */
         @media (min-width: 1201px) {
             #all-participants-container {
@@ -2753,6 +2759,7 @@
             window._rouletteClosedMessage = msg;
             window._gameIsActive = false;
             gameIsActive = false;
+            if (typeof syncParticipantMarqueePauseForGameState === 'function') syncParticipantMarqueePauseForGameState();
             startRequestInFlight = false;
             if (typeof startRequestTimeout !== 'undefined' && startRequestTimeout) {
                 clearTimeout(startRequestTimeout);
@@ -2878,6 +2885,19 @@
 
         // 오디오 관련 변수
         // ── 명단 무한 루프 자동스크롤 (데스크톱·모바일 공통, CSS로 뷰포트 높이만 구분) ──────────────────────────
+        function syncParticipantMarqueePauseForGameState() {
+            var inner = document.getElementById('all-participants-scroll-inner');
+            if (!inner) return;
+            var busyGame = !!gameIsActive || !!window._gameIsActive;
+            var hiddenDoc = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+            if (busyGame || hiddenDoc) {
+                inner.classList.add('participant-marquee-paused');
+            } else {
+                inner.classList.remove('participant-marquee-paused');
+            }
+        }
+        window.syncParticipantMarqueePauseForGameState = syncParticipantMarqueePauseForGameState;
+
         function initParticipantAutoScroll() {
             var track = document.getElementById('all-participants-scroll-track');
             var inner = document.getElementById('all-participants-scroll-inner');
@@ -2892,17 +2912,24 @@
 
             var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             if (reducedMotion) {
+                syncParticipantMarqueePauseForGameState();
                 return;
             }
 
             var originalItems = Array.prototype.slice.call(inner.children);
-            if (!originalItems.length) return;
+            if (!originalItems.length) {
+                syncParticipantMarqueePauseForGameState();
+                return;
+            }
 
             requestAnimationFrame(function () {
                 var originalHeight = inner.scrollHeight;
                 var trackHeight = track.clientHeight || (window.innerWidth >= 1201 ? 560 : Math.min(window.innerHeight * 0.42, 340));
 
-                if (originalHeight <= trackHeight) return; // 명단이 박스보다 짧으면 불필요
+                if (originalHeight <= trackHeight) {
+                    syncParticipantMarqueePauseForGameState();
+                    return; // 명단이 박스보다 짧으면 불필요
+                }
 
                 // 원본 복제 → seamless loop
                 originalItems.forEach(function (item) {
@@ -2914,12 +2941,16 @@
                 // 35px/s (느린 속도)
                 var duration = (originalHeight / 35).toFixed(1);
                 inner.style.animation = 'participantScrollUp ' + duration + 's linear infinite';
+                syncParticipantMarqueePauseForGameState();
             });
         }
         window.initParticipantAutoScroll = initParticipantAutoScroll;
         window.addEventListener('resize', function () {
             clearTimeout(window._participantScrollResizeTimer);
             window._participantScrollResizeTimer = setTimeout(initParticipantAutoScroll, 300);
+        });
+        document.addEventListener('visibilitychange', function () {
+            if (typeof syncParticipantMarqueePauseForGameState === 'function') syncParticipantMarqueePauseForGameState();
         });
         // ──────────────────────────────────────────────────────────────────────
 
@@ -3706,6 +3737,7 @@
                 }
                 gameIsActive = true; // 룰릿 회전 중 → 자동 새로고침 및 UI 갱신 안 함
                 window._gameIsActive = true;
+                if (typeof syncParticipantMarqueePauseForGameState === 'function') syncParticipantMarqueePauseForGameState();
                 setSoundProfileDisabled(true);
                 if (document.getElementById('start-button')) {
                     document.getElementById('start-button').disabled = true;
@@ -3943,6 +3975,7 @@
                 }
                 gameIsActive = false; // 게임 종료 → 이제 자동 새로고침 허용
                 window._gameIsActive = false;
+                if (typeof syncParticipantMarqueePauseForGameState === 'function') syncParticipantMarqueePauseForGameState();
                 setSoundProfileDisabled(false);
                 if (!_uwStale) stopAllSounds(); // 지연 이벤트면 현재 라운드 소리 보호
 
@@ -4115,6 +4148,7 @@
                 }
                 gameIsActive = false; // 리셋 → 자동 새로고침 허용
                 window._gameIsActive = false;
+                if (typeof syncParticipantMarqueePauseForGameState === 'function') syncParticipantMarqueePauseForGameState();
                 setSoundProfileDisabled(false);
                 console.log("게임 리셋 완료");
                 document.getElementById('rotating-container').style.transform = 'rotate(0deg)';
