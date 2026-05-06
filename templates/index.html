@@ -428,6 +428,20 @@
                 margin-top: 14px;
                 width: min(100%, 600px);
                 max-width: 100%;
+                overflow: hidden;
+            }
+
+            /* 게스트 모바일·태블릿: PC와 동일하게 명단을 고정 높이 창 + 무한 롤(세로 나열로 페이지만 길어지지 않음) */
+            #all-participants-scroll-track {
+                height: min(42vh, 340px);
+                max-height: 340px;
+                overflow: hidden;
+                position: relative;
+                box-sizing: border-box;
+            }
+
+            #all-participants-scroll-inner {
+                will-change: transform;
             }
 
             #prize-right-col {
@@ -1227,6 +1241,27 @@
         /* 가운데 묶는 실제 룰렛~사은품 행(디버그용) */
         html.jemin-layout-debug .main-row {
             border: 3px solid #0a0 !important;
+        }
+
+        /* 접근성: 모션 감소 설정 시 자동 롤 대신 일반 스크롤 */
+        @media (prefers-reduced-motion: reduce) {
+            #all-participants-scroll-inner {
+                animation: none !important;
+                transform: none !important;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) and (max-width: 1200px) {
+            #all-participants-scroll-track {
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) and (min-width: 1201px) {
+            #all-participants-scroll-track {
+                overflow-y: auto !important;
+            }
         }
     </style>
     <link rel="icon" href="data:,">
@@ -2842,7 +2877,7 @@
         }
 
         // 오디오 관련 변수
-        // ── 명단 무한 루프 자동스크롤 (데스크톱 전용) ──────────────────────────
+        // ── 명단 무한 루프 자동스크롤 (데스크톱·모바일 공통, CSS로 뷰포트 높이만 구분) ──────────────────────────
         function initParticipantAutoScroll() {
             var track = document.getElementById('all-participants-scroll-track');
             var inner = document.getElementById('all-participants-scroll-inner');
@@ -2855,15 +2890,17 @@
             inner.style.animation = 'none';
             inner.style.transform = 'translateY(0)';
 
-            // 데스크톱(1201px+)에서만 자동스크롤
-            if (window.innerWidth < 1201) return;
+            var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reducedMotion) {
+                return;
+            }
 
             var originalItems = Array.prototype.slice.call(inner.children);
             if (!originalItems.length) return;
 
             requestAnimationFrame(function () {
                 var originalHeight = inner.scrollHeight;
-                var trackHeight = track.clientHeight || 560;
+                var trackHeight = track.clientHeight || (window.innerWidth >= 1201 ? 560 : Math.min(window.innerHeight * 0.42, 340));
 
                 if (originalHeight <= trackHeight) return; // 명단이 박스보다 짧으면 불필요
 
