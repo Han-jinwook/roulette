@@ -873,6 +873,19 @@ def handle_start_rotation(data):
 
     # 총 지속시간도 저장 (추가)
     game['total_duration'] = duration
+
+    # 운영 단말 시계가 서버(UTC) 대비 크게 느리면 duration이 비정상적으로 짧아질 수 있다.
+    # 클라이언트는 로컬 시계 기준 30초 이상만 통과하므로, 서버에서 한 번 더 막아 혼란을 줄인다.
+    if duration < 10:
+        socketio.emit(
+            'error',
+            {'message': '시작 시각이 서버 기준으로 너무 가깝습니다. PC/모바일 시계를 동기화한 뒤(참고 time.is) 다시 시도해 주세요.'},
+            namespace='/',
+            to=request.sid,
+        )
+        game['target_time'] = None
+        game['total_duration'] = None
+        return
     
     # 최종 회전 각도 미리 결정 (720~1440도 사이 랜덤)
     # 정확한 계산을 위해 소수점 자리까지 유지
