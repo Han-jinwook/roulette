@@ -1,101 +1,130 @@
-# 룰렛 프로젝트 help.md (리셋본)
+# 룰렛 프로젝트 — 외부 조언용 현상·조치 정리
 
-## 문서 리셋 일시
+## 문서 목적·갱신
 
-- **기록 일시:** 2026-04-21 (KST 기준, 외부 문의·인수인계용으로 전면 재작성)
-- **최종 갱신:** 2026-04-21 — §1 **레이아웃 이슈 종료** 반영(사용자 확인: 꼼짝 없음)
-- **저장소:** `roulette-1` (Flask + Flask-SocketIO + 단일 `templates/index.html` + Supabase)
-- **이 문서의 목적:** 외부(다른 개발자·커뮤니티·벤더)에 질의할 때 붙여 넣을 수 있는 **현상·시도·환경** 요약
+- **목적:** 다른 개발자·커뮤니티·인프라 담당자에게 **재현 맥락·시도한 조치·미해결 질문**을 한 번에 전달하기 위한 메모.
+- **작성·갱신 일시:** 2026-05-06 (KST)
+- **저장소:** `roulette-1` — Flask + Flask-SocketIO, 단일 `templates/index.html`(UI·클라이언트 전부), Supabase, 배포는 **Render**(Starter 플랜 등 — 동시 접속·CPU에 민감할 수 있음).
 
 ---
 
-## 1) 게스트(Chrome) 레이아웃 점프 + 좌측 붙음 — **종료(2026-04-21)**
+## 1) 현재 관측되는 문제(운영 체감)
 
-### 1.1 당시 현상
+### 1.1 한 줄 요약
 
-- **가로:** 루트 스크롤바 생김/사라짐에 따라 **본문이 좌우로 “한 칸” 밀리는** 느낌(Layout shift). thumb 길이 변화 자체는 부차적.
-- **정렬:** `flex` + `margin: auto`만으로는 **게스트에서 메인이 왼쪽에 붙은 채** 넓은 화면이 휑해 보임(“끔찍할 정도” 피드백).
+**같은 이벤트·같은 라운드에 게스트 단말이 3대(또는 PC 게스트 포함)로 늘어나면, “먼저 붙어 있던” 일부 단말만 안정적으로 원판이 돌고, 나머지는 화면은 들어왔는데 멈춘 듯 보이거나 간헐적으로만 따라 돌다 멈춘다.** 와이파이만으로는 설명하기 어렵고, **연결 순서·지연·서버/클라 부하**와 맞물린다는 가설이 강함.
 
-### 1.2 확정한 원인 요약
+### 1.2 구체적 시나리오(최근 재현에 가까운 서술)
 
-1. **`#main-container { justify-content: center }`** — 과거에는 루트 스크롤바 **토글**로 가용 너비가 바뀔 때 **가로 행이 재중앙**되며 밀림. **`html` 스크롤 트랙 고정 후**에는 같은 이유가 약해져 `center` 복구 가능(재미니).
-2. **`body { align-items: center }`** + flex 자식 — 교차축에서 **폭·정렬이 흔들릴 여지**.
-3. **`100vw` / `92vw`** — 세로 스크롤 유무와 **가로 재계산**이 맞물림.
-4. **`#main-container`만 `width: 100%` + `margin: 0 auto`** — `body`가 `display: flex`일 때 자식이 **가로 100%로 풀리면** `margin: auto`가 **좌우 여백을 못 나눔** → 게스트도 **왼쪽 붙음**처럼 보임.
+1. **모바일 게스트 A, B** — 페이지를 **먼저** 연 뒤 두 대 모두 **정상** 회전·멈춤.
+2. **모바일 게스트 C(3번째)** — 화면은 들어오나 **대부분 멈춘 상태**로 보임. **가끔 한 번씩** 따라 돌다가 다시 멈추는 식의 **간헐 동작**.
+3. **PC 게스트** — 앱(브라우저) **아주 늦게 진입**한 경우, **모바일 2대와 함께 한동안 정상처럼** 보인 적도 있음(“처음으로 게스트 3대가 함께 도는” 느낌).
+4. 그러나 **곧바로 안정적이지 않음:** 3번째 모바일은 다시 **멈춤**에 가깝고, **PC 게스트도 멈춤**으로 돌아가는 경우가 있음. **처음부터 붙어 있던 모바일 2대만** 라운드를 여러 번 돌려도 **계속 정상**인 패턴이 반복됨.
 
-### 1.3 최종 해결 구조 (`templates/index.html`)
+### 1.3 “증상”과 구분해야 할 것
 
-| 레이어 | 역할 |
-|--------|------|
-| **`html`** | `overflow-y: scroll !important`, `scrollbar-gutter: stable`, `height: 100%` — **스크롤 트랙 자리 고정**(재미니 “safe centering”과 정합). |
-| **`body`** | `flex-direction: column`, **`align-items: stretch`**, `overflow-y: visible` — 루트만 세로 스크롤. |
-| **`.layout-shell`** | **`#header` + `#controls` + `#main-container`**를 한 블록으로 감쌈. `width: min(100%, 1600px)`, `margin-left/right: auto`, `align-self: center` — **flex 자식 단독으로는 안 되던 중앙 정렬**을 블록 단위로 해결. |
-| **`#main-container`** | 데스크톱: **`justify-content: center`**(가로 행 시각적 중앙). `html` 스크롤 트랙 고정으로 예전 같은 폭 토글·밀림은 없어야 함. 모바일(`@media`)은 **`flex-start`** 유지(세로 스택 상단 정렬). 폭은 셸 안 `width: 100%`. |
-| **모바일** (`max-width: 1200px`) | `.layout-shell`을 `align-self: stretch`, `margin: 0`, `max-width: 100%`로 풀폭. |
-| **기타** | `@media`의 `vw` 제거·차트 `aspect-ratio`, 내부 패널 `scrollbar-gutter` 제거 등(`389410e`, `3975b29` 계열). |
+- 운영자 화면과 **완전 동기화 안 됨**이 목표라기보다, **각 게스트가 최소한 한 라운드 전체를 끝까지 시각적으로 돌고 당첨·종료까지 가는 것**이 기대.
+- “멈춤”이 **(a) 애니메이션 rAF가 안 돌거나**, **(b) `start_game`/상태 동기화가 늦게 와서 즉시 종료 분기로 타거나**, **(c) 탭 백그라운드/절전으로 이벤트 루프가 쪼개지거나**, **(d) 소켓 연결은 살아 있는데 핸들러만 누락** 등 여러 층이 겹칠 수 있음 — **아직 단일 원인 미확정**.
 
-- **운영자 전용** `#sound-controls`, `#operator-dashboard-wrap`은 **`.layout-shell` 밖** — 대시보드는 계속 넓게 쓸 수 있음.
+---
 
-### 1.4 커밋 타임라인 (이슈 마무리)
+## 2) 기술 맥락(코드·아키텍처)
 
-| 커밋 | 내용 |
+### 2.1 동기화 흐름(개략)
+
+- 운영자가 회전 시작 시 서버가 **`start_game`** 을 Socket.IO로 브로드캐스트.
+- 페이로드에는 대략 **`duration`**, **`target_unix_ms`**, **`sent_unix_ms`**(지연 보정용), **`finalAngle`**, **`round_id`** 등이 포함.
+- 클라이언트는 **`sent_unix_ms` 기반 동적 지연 보정**을 쓰도록 되어 있고, **고정 상수**(`ROULETTE_STOP_COMP_MS`, `ROULETTE_ANGLE_COMP_DEG` 등)는 **근거 없이 바꾸지 않는 것**이 프로젝트 가드레일(`.cursor/rules/vibe-basic-guardrails.mdc`).
+
+### 2.2 “늦게 도착한 `start_game`”과 클라이언트
+
+- `target_unix_ms`가 수신 시점 기준으로 이미 지났거나 거의 남지 않은 경우, 과거에는 **첫 프레임에서 바로 멈춤**처럼 보일 수 있음.
+- 이에 대해 **최소 가시 회전 시간(로컬 `stopAtUnixMs` 바닥)** 을 두는 패치를 적용함(커밋 `97abf26`).  
+  **그럼에도** 사용자 체감상 3번째 단말 문제는 **여전히 비슷하게 남아 있다**고 보고됨(“약간 차이” 수준).
+
+### 2.3 서버: `request_game_status` 부하 완화
+
+- 다수 게스트가 동시에 접속·재연결할 때 **Supabase `get_data`가 폭주**하면 지연·타임아웃이 누적될 수 있음.
+- 대응(커밋 `71dd3ec` 요지):
+  - **소켓 `sid`당 쿨다운**(예: 2초)으로 `request_game_status` 처리 빈도 제한.
+  - 최근 스냅샷 캐시가 **짧은 TTL 이내**면 **캐시만으로 응답**해 DB 조회 생략(로그에 캐시 전용 스로틀 흔적).
+- 목적은 **서버·DB 병목 완화**이지, “3번째 단말만 원판이 안 돈다”를 직접 증명한 해결은 아님.
+
+### 2.4 서버: 짧은 `duration` 거부
+
+- 운영 단말 **시계가 서버와 크게 어긋난 경우** 회전 시간이 비정상적으로 짧게 계산될 수 있음.
+- 서버에서 **기준 시간으로 duration이 너무 짧으면** 시작을 거부하고 상태 정리(커밋 `ec2b106`).
+
+### 2.5 클라이언트: 재연결·탭 복귀 시 동기화
+
+- `connect` 시 **`request_game_status`**, `visibilitychange` / `online` / `pageshow`(bfcache) 등에서 **디바운스 재요청**(커밋 `cf292e6`).
+- 목적: **뒤늦게 들어온 탭**이 진행 중 라운드와 맞도록.
+
+---
+
+## 3) 이미 시도했으나 롤백·보류된 것(맥락용)
+
+- **모바일 명단 “물레방아” 스크롤, 전역 터치 캡처·효과음 unlock 실험** 등은 **갤럭시 먹통·아이폰 무음** 등 부작용으로 **전부 롤백**, 안정 커밋 기준으로 되돌린 이력 있음(대화·로그 기준; 세부 SHA는 별도 타임라인 참고).
+- **카운트다운 250ms 등 클라이언트 타이밍 실험**도 이상 동작 보고 후 **revert**, 사용자 force reset으로 **`a1015f9` 부근 안정선** 복귀 이력 있음.
+
+---
+
+## 4) 조치 요약 표(최근·관련 커밋)
+
+| 커밋 | 대략적 내용 |
+|------|-------------|
+| `97abf26` | `start_game` 늦은 수신 시 `stopAtUnixMs` 바닥으로 최소 가시 회전·카운트다운·백업 타이머 정합 |
+| `71dd3ec` | `request_game_status` sid당 쿨다운 + 캐시-only 스로틀로 동시 게스트 부하 완화 |
+| `ec2b106` | `start_rotation`: 서버 기준 duration 비정상 짧으면 거부 |
+| `cf292e6` | connect/가시성/온라인/bfcache 경로에서 `request_game_status` 재동기화 |
+| `a1015f9` | (참고) 게스트 스크롤 이슈 등 **안정 기준으로 자주 언급되는 커밋** |
+
+---
+
+## 5) 아직 열린 질문(외부에 물어보고 싶은 것)
+
+1. **Render + Flask-SocketIO(eventlet/gevent?)** 에서 **동시 연결 ~3–10·브로드캐스트**만으로도 **특정 클라이언트에만 이벤트 지연·누락**이 생기는지, 권장 **워커 수 / WebSocket 프록시 / pingTimeout** 설정이 있는지.
+2. **모바일 Chrome/Safari**에서 **백그라운드 탭·절전 직후** `requestAnimationFrame`·`setTimeout`이 **어떻게 밀리는지**, “간헐적으로 한 번 돌다 멈춤”과 **상관 있는지**.
+3. **`start_game`이 모든 sid에 동일하게 emit 되는지** 서버 로그·클라이언트 `recv` 타임스탬프로 **증명하는 최소 계측**(한 라운드에 `round_id` + 각 클라이언트 `performance.now()` + `sent_unix_ms` 로그)을 어떻게 두면 좋은지.
+4. **3번째 클라이언트만** `game_status`는 오는데 **`start_game`이 늦거나 한 번 건너뛰는** 경우가 있는지 — 현재 코드상으로는 **가능/불가능** 논리 점검이 필요.
+5. Supabase/외부 I/O가 아닌 **순수 Socket.IO** 경로만으로 재현되는지(로컬에서 `get_data` 목 처리 등) **분리 실험** 설계.
+
+---
+
+## 6) 재현·수집하면 좋은 증거(체크리스트)
+
+- [ ] 동일 Wi-Fi vs **한 대만 LTE** 등 네트워크 분리 테스트.
+- [ ] 문제 단말에서 **개발자 도구**: Console 에러, `[timing-debug]` 로그(켜는 플래그가 있다면), `start_game` 수신 시각, **`[ROUND_START]`** 한 줄 로그(동일 `round_id`로 단말 간 지연 비교).
+- [ ] **Socket.IO가 WebSocket으로 붙었는지 확인**(폴링만이면 지연·뭉침 가능성 큼): Chrome 개발자 도구 → **Network** → 필터 **WS** → `socket.io` 요청 선택 → **Headers**에서 **Status Code: 101 Switching Protocols** 여부 확인. 101이 없고 `xhr`/`polling` 요청만 반복되면 Long-polling 위주로 동작 중일 수 있음.
+- [ ] 서버(Render) 로그: 동일 `round_id`에 대해 **`start_game` emit 직전/직후**, `request_game_status` 스로틀 메시지 빈도.
+- [ ] 3번째 단말이 **항상 “같은 순서로 연결한 기기”**인지, **기기 모델/OS**만의 문제인지.
+
+### 6.1) Transport 확인 요약
+
+| 관측 | 의미 |
 |------|------|
-| `d863c66` | `body` stretch + `#main-container` `justify-content: flex-start` (당시 가로 점프 완화; 이후 스크롤 고정·셸과 함께 `center`로 복구 가능) |
-| `d7dd46f` | `html` 스크롤 고정 강화 + `main`에 `margin: auto`·`min(100%,1600px)` 시도(단독으로는 한계) |
-| `6e91f06` | **`.layout-shell` 도입** — 좌측 붙음·중앙 복구의 **결정타** |
-| (선행) `389410e`, `3975b29`, `660db3e` 등 | `vw` 제거, 내부 `scrollbar-gutter`, 루트 `html` 스크롤 등 |
-| `ecbc2a2` | 스크롤 트랙 고정 전제로 **`#main-container` `justify-content: center`** 복구(넓은 화면 행 중앙, 재미니) |
+| WS 요청 + **101 Switching Protocols** | 브라우저↔서버 구간에서 WebSocket 업그레이드 성공 |
+| **xhr** `socket.io` 폴링만 반복 | 업그레이드 실패·프록시 제한 등으로 폴링 의존 가능성 → 다중 단말 동시성에 불리 |
 
-### 1.5 사용자 확인
-
-- **“꼼짝을 안 한다”** — 가로 시프트·이중 스크롤 체감이 **해소된 상태로 보고**(2026-04-21).
-- **후속(재미니):** 루트 스크롤 트랙이 이미 고정이므로, 넓은 화면에서 행이 왼쪽에만 몰리지 않게 데스크톱 **`#main-container`에 `justify-content: center` 복구**. 모바일 `@media`는 `flex-start` 유지.
-
-### 1.6 재발·회귀 시 (재미니 체크리스트 요약)
-
-- DevTools로 **스크롤이 실제로 붙는 노드** 확인(가짜 루트).
-- **`html` 스크롤 트랙이 깨지면** 다시 `justify-content: center`가 **폭 변동 + 재중앙**과 맞물릴 수 있음 → 루트 스크롤부터 확인.
-- **`layout-shell`을 깨거나** `body`를 다시 `align-items: center`만 두지 않기.
-- 임시 분기용 CSS는 아래(필요 시만 로컬).
-
-```css
-html { overflow-y: scroll !important; }
-body, #main-container { overflow-y: visible !important; height: auto !important; min-height: 100vh; }
-```
+다음 순위 실험: 클라이언트에서 `io({ transports: ['websocket'], upgrade: false })` 등으로 **WebSocket만 강제**해 재현 여부 비교(Render·중간 프록시가 WS를 막으면 연결 자체가 실패할 수 있음).
 
 ---
 
-## 2) 최근에 잡힌 이슈(DB / 당첨자 리셋) — 참고만
+## 7) 코드에서 먼저 보면 좋은 위치
 
-- Supabase `participants` 테이블에 **`id` NOT NULL + default 없음** + 정수 PK 등으로 **`save`/당첨자 리셋 시 23502·22P02**가 연쇄 발생.
-- 앱 쪽에서 **정수 PK면 `max(id)+1` 보강**, **UUID면 클라이언트 uuid**, **`created_at` 보강**, **작성자 키 NFC 정규화** 등으로 완화·해결 시도.  
-- 대표 커밋: `585ae42`, `a6f259f`, `e1bfa60`, `f14758e` 등.  
-- **운영 권장:** 장기적으로는 DB에 `id`용 **`GENERATED …` / `DEFAULT gen_random_uuid()`** 등을 두는 것이 안전.
-
----
-
-## 3) 코드베이스에서 외부가 먼저 보면 좋은 파일
-
-- `templates/index.html` — 거의 모든 UI/CSS/클라이언트 소켓·룰렛 애니메이션
-- `comment_dart.py` — 라우트·SocketIO·게스트/운영자 분기
-- `standalone_comment_monitor/db_handler.py` — Supabase 읽기/쓰기
-- `.cursor/rules/vibe-basic-guardrails.mdc` — **타이밍 상수 임의 변경 금지** 등 프로젝트 가드레일
+- `templates/index.html` — `socket.on('start_game' …)`, `socket.on('game_status' …)`(또는 동일 이름의 상태 핸들러), 카운트다운·`requestAnimationFrame` 루프.
+- `comment_dart.py` — `@socketio.on('start_rotation')`, `@socketio.on('request_game_status')`, `start_game` emit, `_EVENT_SYNC_CACHE` / `_GAME_STATUS_*` 상수.
+- `.cursor/rules/vibe-basic-guardrails.mdc` — 타이밍 관련 변경 시 준수 사항.
 
 ---
 
-## 4) 운영 시 주의(이전 help에서 이어지는 원칙 요약)
+## 8) 이 문서 이후의 다음 액션(제안)
 
-- **타이밍 상수**(`ROULETTE_STOP_COMP_MS`, `ROULETTE_ANGLE_COMP_DEG`, `NETWORK_LAG_COMP_MAX_MS` 등)는 **증거 없이 변경하지 말 것**.
-- `help.md`는 **사용자가 수정하라고 할 때만** 편집하는 것을 선호함(이번 항목은 **명시적 요청**으로 작성).
-
----
-
-## 5) 다음 액션 (레이아웃 회귀 시)
-
-1. **§1.3·§1.6** 순서로 원인 좁히기 — `.layout-shell` 포함 여부, `justify-content`, `body` `align-items`.
-2. **DevTools**로 스크롤 소유 노드 확인 후 최소 패치(타이밍 상수·룰렛 로직은 건드리지 않기).
-3. UI 대수정 전 **게스트·운영자·좁은/넓은 창** 각각 한 번씩 확인.
+1. **한 라운드에 한정한 계측:** 서버가 `start_game` 보낼 때 `round_id` + 단일 서버 타임스탬프 로그; 각 클라이언트는 수신 즉시 `Date.now()`, `sent_unix_ms`, `target_unix_ms` 를 한 줄로 전송(또는 콘솔 고정 포맷)해 **“누가 못 받았는지 / 몇 ms 늦었는지”** 표로 남기기.
+2. **문제 단말만** “뒤늦게 진입”이 아니라 **처음부터 켜 둔 3번째**인지 비교 — 연결 순서 의존이면 **서버 측 연결 핸들러·룸 join**을 의심.
+3. Render 대시보드에서 **CPU 스파이크·응답 지연**과 라운드 시각 상관.
+4. 필요 시 **Socket.IO transport 강제(polling-only 테스트)** 등으로 **WebSocket 중간 프록시 이슈** 배제.
 
 ---
 
-*끝.*
+*문서 끝. 외부에 그대로 공유해도 되도록 작성함.*

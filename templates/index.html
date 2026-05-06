@@ -3637,15 +3637,22 @@
                     var recvMs = Date.now();
                     var sentMs = Number((data && data.sent_unix_ms) || 0);
                     var targetMs = Number((data && data.target_unix_ms) || 0);
+                    var roundIdForLog = (data && data.round_id) ? String(data.round_id) : '';
                     var tr2 = (socket && socket.io && socket.io.engine && socket.io.engine.transport)
                         ? socket.io.engine.transport.name
                         : '(unknown)';
+                    var receiveDelayMs = sentMs > 0 ? (recvMs - sentMs) : null;
+                    // 지연 vs 누락 진단용: 플래그와 무관하게 항상 한 줄 로그 (여러 단말 동시 캡처용)
+                    console.log('[ROUND_START] ID: ' + roundIdForLog + ' | Delay: ' + (receiveDelayMs != null ? receiveDelayMs + 'ms' : '(no sent_unix_ms)') + ' | Target: ' + (targetMs || '(none)') + ' | Transport: ' + tr2);
+                    if (receiveDelayMs !== null && receiveDelayMs > 2000) {
+                        console.warn('[ROUND_START] 수신 지연이 2초를 초과했습니다. 애니메이션이 밀릴 수 있습니다.', { delay_ms: receiveDelayMs, round_id: roundIdForLog || null });
+                    }
                     if (DEBUG_TIMING_LOG) {
                         console.log('[timing-debug][start_game]', {
                             transport: tr2,
                             sent_unix_ms: sentMs || null,
                             recv_unix_ms: recvMs,
-                            recv_minus_sent_ms: sentMs > 0 ? (recvMs - sentMs) : null,
+                            recv_minus_sent_ms: receiveDelayMs,
                             network_lag_comp_ms: networkLagCompMs,
                             payload_duration_s: Number((data && data.duration) || 0),
                             remain_by_target_s: targetMs > 0 ? ((targetMs - recvMs) / 1000) : null
