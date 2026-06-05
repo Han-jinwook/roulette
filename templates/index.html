@@ -2993,8 +2993,18 @@
             return n;
         }
         function applySoundVolumeToPlaying() {
+            var isMuted = (soundVolume <= 0);
             if (beepAudio) {
-                try { beepAudio.volume = soundVolume; } catch (e) {}
+                try { 
+                    beepAudio.volume = soundVolume; 
+                    beepAudio.muted = isMuted;
+                } catch (e) {}
+            }
+            if (fanfareAudioEl) {
+                try { 
+                    fanfareAudioEl.volume = soundVolume; 
+                    fanfareAudioEl.muted = isMuted;
+                } catch (e) {}
             }
         }
         function setSoundVolume(v, persist) {
@@ -3262,6 +3272,7 @@
                 if (!audio) return;
                 audio.loop = true;
                 audio.volume = soundVolume;
+                audio.muted = (soundVolume <= 0);
                 audio.play().catch(err => {
                     if (token !== beepPlayToken || beepAudio !== audio) return;
                     console.warn("비프음 재생 실패:", err.name);
@@ -3308,6 +3319,7 @@
                 if (!audio) return;
                 audio.loop = false;
                 audio.volume = soundVolume;
+                audio.muted = (soundVolume <= 0);
                 audio.currentTime = 0;
                 audio.play()
                     .then(() => console.log("팡파레 재생 성공"))
