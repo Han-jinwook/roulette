@@ -3028,6 +3028,19 @@
             valueEls.forEach(function (valEl) {
                 if (valEl) valEl.textContent = pct + '%';
             });
+            
+            // iOS 전용 토글 버튼 상태 업데이트
+            var adminToggle = document.getElementById('admin-ios-toggle');
+            if (adminToggle) {
+                if (soundVolume > 0) { adminToggle.textContent = 'ON (끄기)'; adminToggle.style.background = '#fff'; adminToggle.style.borderColor = '#4CAF50'; adminToggle.style.color = '#4CAF50'; }
+                else { adminToggle.textContent = 'OFF (켜기)'; adminToggle.style.background = '#ffe0e0'; adminToggle.style.borderColor = '#E53935'; adminToggle.style.color = '#E53935'; }
+            }
+            var guestToggle = document.getElementById('guest-ios-toggle');
+            if (guestToggle) {
+                if (soundVolume > 0) { guestToggle.textContent = 'ON (끄기)'; guestToggle.style.background = '#fff'; guestToggle.style.borderColor = '#1E88E5'; guestToggle.style.color = '#1E88E5'; }
+                else { guestToggle.textContent = 'OFF (켜기)'; guestToggle.style.background = '#ffe0e0'; guestToggle.style.borderColor = '#E53935'; guestToggle.style.color = '#E53935'; }
+            }
+
             if (persist) {
                 try { localStorage.setItem(SOUND_VOLUME_STORAGE_KEY, String(soundVolume)); } catch (e) {}
             }
@@ -3055,6 +3068,40 @@
             sel.title = disabled ? '룰렛 진행 중에는 효과음을 변경할 수 없습니다.' : '';
         }
         function initSoundControls() {
+            var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            if (isIOS) {
+                // Hide sliders and show toggle buttons for iOS
+                ['sound-volume', 'guest-sound-volume'].forEach(id => {
+                    var el = document.getElementById(id);
+                    if (el) el.style.display = 'none';
+                });
+                ['sound-volume-value', 'guest-sound-volume-value'].forEach(id => {
+                    var el = document.getElementById(id);
+                    if (el) el.style.display = 'none';
+                });
+                var adminLabel = document.querySelector('#sound-controls label');
+                if (adminLabel) adminLabel.textContent = '효과음';
+                var guestLabel = document.getElementById('guest-sound-label');
+                if (guestLabel) guestLabel.textContent = '효과음';
+
+                function createToggle(parentId, idPrefix, activeColor) {
+                    var parent = document.getElementById(parentId);
+                    if (!parent) return;
+                    var btn = document.createElement('button');
+                    btn.id = idPrefix + '-ios-toggle';
+                    btn.type = 'button';
+                    btn.style.cssText = 'padding:4px 12px; margin-left:8px; border-radius:4px; border:1px solid ' + activeColor + '; background:#fff; cursor:pointer; font-weight:bold; color:' + activeColor + ';';
+                    btn.textContent = 'ON';
+                    btn.onclick = function() {
+                        if (soundVolume > 0) setSoundVolume(0, true);
+                        else setSoundVolume(0.8, true);
+                    };
+                    parent.appendChild(btn);
+                }
+                createToggle('sound-controls', 'admin', '#4CAF50');
+                createToggle('guest-sound-controls', 'guest', '#1E88E5');
+            }
+
             var sliders = [
                 document.getElementById('sound-volume'),
                 document.getElementById('guest-sound-volume')
