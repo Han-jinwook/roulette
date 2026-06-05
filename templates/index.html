@@ -4960,10 +4960,7 @@
                 window.ENABLE_SUPABASE_RT = true;
             }
             var isGuestView = document.getElementById('guest-current-time') !== null;
-            if (isGuestView) {
-                // 모바일 게스트는 RT 기반 자동 새로고침보다 socket/game_status DOM 동기화가 안정적
-                window.ENABLE_SUPABASE_RT = false;
-            }
+            // 게스트도 이벤트 전환 등 중요한 DB 변경을 감지하기 위해 RT를 유지합니다 (Socket.io 유실 대비 백업).
             if (!window.ENABLE_SUPABASE_RT) {
                 console.log('[Supabase RT] disabled');
                 return;
