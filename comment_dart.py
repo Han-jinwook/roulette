@@ -449,8 +449,6 @@ def _roulette_list_from_allowed_dict(allowed_dict, winners_str, allow_duplicates
             t = 1
         participants.append((name_norm, t, None))
     participants.sort(key=lambda x: _ko_first_name_key(x[0]))
-    if len(participants) > 100:
-        participants = [(f"{i+1}", p[1], p[2]) for i, p in enumerate(participants)]
     return participants
 
 
@@ -492,10 +490,6 @@ def load_participants(filename="participants.txt", active_event_id=None):
                         participants.append((name, count, created_at))
                     
                     participants.sort(key=lambda x: _ko_first_name_key(x[0]))
-                    
-                    # 별명 100개 이상이면 숫자로 대체 (기존 로직 유지)
-                    if len(participants) > 100:
-                        participants = [(f"{i+1}", p[1], p[2]) for i, p in enumerate(participants)]
                     
                     print(f"DEBUG: Loaded {len(participants)} participants from DB for {active_url}")
                     return participants
