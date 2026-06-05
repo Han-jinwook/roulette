@@ -422,6 +422,7 @@
                 aspect-ratio: 1;
                 height: auto;
                 flex: 0 0 auto;
+                order: 1;
             }
 
             #all-participants-container {
@@ -430,6 +431,7 @@
                 width: min(100%, 600px);
                 max-width: 100%;
                 overflow: hidden;
+                order: 3;
             }
 
             /* 게스트 모바일·태블릿: PC와 동일하게 명단을 고정 높이 창 + 무한 롤(세로 나열로 페이지만 길어지지 않음) */
@@ -452,6 +454,7 @@
                 max-width: 100%;
                 min-width: 0;
                 height: auto;
+                order: 2;
             }
 
             /* 모바일에서는 카드 본문이 0 높이로 접히지 않도록 flex-grow 해제 */
@@ -1401,7 +1404,7 @@
         <!-- 사은품 목록 (오른쪽으로 이동) -->
         <div id="prize-right-col">
             <div id="prize-container">
-                <h3>🎁 사은품 목록</h3>
+                <h3>🎁 사은품 & 당첨자</h3>
                 <div id="prize-list">
                     {% if prizes %}
                     {% set p_list = prizes.split('\n') %}
