@@ -1300,6 +1300,10 @@
         {% if user.is_authenticated %}
         <div id="time-controls">
             <div class="time-control-item">
+                <span class="time-label">현재시간:</span>
+                <span id="current-time" class="time-value"></span>
+            </div>
+            <div class="time-control-item">
                 <span class="time-label">슈팅시간 설정:</span>
                 <input type="text" id="target-time" placeholder="HH:MM:SS" value="">
                 <button id="plus-minute-button" type="button">+60초</button>
@@ -1310,16 +1314,17 @@
                 <span class="time-label">남은시간:</span>
                 <span id="remaining-time" class="time-value">--:--:--</span>
             </div>
-            <div class="time-control-item">
-                <span class="time-label">현재시간:</span>
-                <span id="current-time" class="time-value"></span>
-            </div>
         </div>
         {% else %}
         <!-- 게스트 모드용 시간 표시 -->
         <div id="time-controls" class="guest-mode">
             <div class="guest-time-wrap">
                 <div class="guest-time-badges">
+                <div class="time-control-item"
+                    style="background-color: rgba(33, 150, 243, 0.2); padding: 8px 15px; border-radius: 8px; border: 1px solid #1E88E5;">
+                    <span class="time-label" style="color: #1565c0;">현재시간:</span>
+                    <span id="guest-current-time" class="time-value" style="font-weight: bold;"></span>
+                </div>
                 <div class="time-control-item"
                     style="background-color: rgba(76, 175, 80, 0.2); padding: 8px 15px; border-radius: 8px; border: 1px solid #4CAF50;">
                     <span class="time-label" style="color: #2e7d32;">슈팅시간:</span>
@@ -1330,11 +1335,6 @@
                     <span class="time-label" style="color: #c62828;">남은시간:</span>
                     <span id="guest-remaining-time" class="time-value"
                         style="font-weight: bold; color: #d32f2f;">--:--:--</span>
-                </div>
-                <div class="time-control-item"
-                    style="background-color: rgba(33, 150, 243, 0.2); padding: 8px 15px; border-radius: 8px; border: 1px solid #1E88E5;">
-                    <span class="time-label" style="color: #1565c0;">현재시간:</span>
-                    <span id="guest-current-time" class="time-value" style="font-weight: bold;"></span>
                 </div>
                 </div>
                 <div id="guest-sound-controls">
