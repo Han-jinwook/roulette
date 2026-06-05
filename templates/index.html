@@ -3904,33 +3904,11 @@
                 document.getElementById('winner').innerText = '';
 
                 const startTime = Date.now();
-                // 늦게 도착한 start_game: 서버 target이 이미 임박/과거여도 최소 가시 회전 보장
-                // (ROULETTE_* 고정 상수와 별개인 수신 지연 UX 바닥 — 동적 보정 원칙 유지)
+                // 기기별 시계(Date.now) 오차로 인해 게스트가 먼저/늦게 끝나는 현상을 막기 위해,
+                // start_game에서는 항상 서버가 준 고정 duration(네트워크 지연 보정됨)을 사용합니다.
                 const durMs = Math.max(50, duration * 1000);
-                const MIN_LATE_SPIN_MS = 750;
-                let stopAtUnixMs;
-                let totalDuration;
-                if (targetUnixMs > 0) {
-                    const serverRemainMs = targetUnixMs - startTime;
-                    if (serverRemainMs >= MIN_LATE_SPIN_MS) {
-                        stopAtUnixMs = targetUnixMs;
-                        totalDuration = serverRemainMs;
-                    } else {
-                        const floorMs = Math.max(MIN_LATE_SPIN_MS, durMs * 0.35);
-                        stopAtUnixMs = startTime + floorMs;
-                        totalDuration = floorMs;
-                        if (DEBUG_TIMING_LOG) {
-                            console.log('[timing-debug][start_game late-spin]', {
-                                serverRemainMs: serverRemainMs,
-                                floorMs: floorMs,
-                                durMs: durMs
-                            });
-                        }
-                    }
-                } else {
-                    totalDuration = durMs;
-                    stopAtUnixMs = startTime + totalDuration;
-                }
+                let totalDuration = durMs;
+                let stopAtUnixMs = startTime + totalDuration;
 
                 // 카운트다운: 실제 멈춤 시각(stopAtUnixMs)과 동일 축 (늦은 수신 시에도 0으로 즉시 붕괴하지 않음)
                 startCountdown(Math.max(0, (stopAtUnixMs - Date.now()) / 1000));
