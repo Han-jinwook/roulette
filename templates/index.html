@@ -3984,11 +3984,15 @@
                             // update_participants가 update_winner보다 먼저 도착해도
                             // 당첨 체크가 즉시 빠지지 않도록 선제적으로 보류 플래그를 건다.
                             window._holdWinnerChecksUntilNextStart = true;
-                            socket.emit('confirm_winner', {
-                                event_id: rouletteLiveKey(),
-                                url: rouletteLiveKey(),
-                                round_id: window.animationInfo.roundId || ''
-                            });
+                            
+                            var isGuestView = document.getElementById('guest-current-time') !== null;
+                            if (!isGuestView) {
+                                socket.emit('confirm_winner', {
+                                    event_id: rouletteLiveKey(),
+                                    url: rouletteLiveKey(),
+                                    round_id: window.animationInfo.roundId || ''
+                                });
+                            }
                         }
                         return;
                     }
@@ -4028,11 +4032,15 @@
 
                         // 백업 타이머 경로도 동일하게 체크 유지 보류를 먼저 건다.
                         window._holdWinnerChecksUntilNextStart = true;
-                        socket.emit('confirm_winner', {
-                            event_id: rouletteLiveKey(),
-                            url: rouletteLiveKey(),
-                            round_id: window.animationInfo.roundId || ''
-                        });
+                        
+                        var isGuestView = document.getElementById('guest-current-time') !== null;
+                        if (!isGuestView) {
+                            socket.emit('confirm_winner', {
+                                event_id: rouletteLiveKey(),
+                                url: rouletteLiveKey(),
+                                round_id: window.animationInfo.roundId || ''
+                            });
+                        }
 
                         console.log('백업 타이머로 애니메이션 종료');
                     }
