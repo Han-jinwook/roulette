@@ -1458,7 +1458,10 @@
         </div>
     </div>
     <div id="operator-dashboard-wrap">
-        <h2>운영자 대시보드 · 이벤트 / 명단 / 사은품</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+            <h2>운영자 대시보드 · 이벤트 / 명단 / 사은품</h2>
+            <button type="button" onclick="document.getElementById('guide-modal').style.display='flex'" style="padding: 6px 14px; background-color: #2e7d32; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; margin-bottom: 10px;">📖 사용 가이드</button>
+        </div>
         <p style="color:#666;font-size:0.9em;margin:0 0 16px;">명단: 한 줄에 <strong>별명 숫자</strong> 또는 CSV(별명,숫자). <strong>새 이벤트로 등록</strong>은 DB에 쓰지 않고 폼만 비우고 새 ID만 잡습니다. 실제 반영은 맨 아래 <strong>저장</strong> 한 번(수정도 동일)입니다. <strong>히스토리</strong>는 지난 회차 불러오기, <strong>일시</strong>는 상단 제목 옆 표시에 쓰입니다.</p>
         <input type="hidden" id="op-event-key" value="{{ current_url or '' }}" />
         <div class="op-row" style="margin-top:16px">
@@ -5067,6 +5070,38 @@
             } catch (e) { console.error('[Supabase RT] 오류:', e); }
         })();
     </script>
+    <!-- 사용 가이드 모달 -->
+    <div id="guide-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+        <div style="background:white; padding:30px; border-radius:8px; max-width:600px; width:90%; max-height:80vh; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+            <h2 style="margin-top:0; color:#2e7d32;">📖 운영자 사용 가이드</h2>
+            <hr style="border:0; border-top:1px solid #ccc; margin:15px 0;">
+            <h3 style="color:#d32f2f;">1. ⏰ 컴퓨터 시계 표준시 동기화 (가장 중요!)</h3>
+            <p style="font-size:15px; line-height:1.5;"><strong>반드시 방송 전, 운영자 컴퓨터의 시계를 네이버 표준시와 1초의 오차도 없이 동기화해주세요.</strong></p>
+            <ul style="font-size:14px; line-height:1.6; color:#444;">
+                <li>윈도우 우측 하단 시계 우클릭 > <strong>[날짜/시간 조정]</strong> 메뉴 진입</li>
+                <li>[자동으로 시간 설정] 켬 > <strong>[지금 동기화]</strong> 버튼을 눌러 성공 메시지 확인</li>
+                <li>카운트다운 타이머와 실제 룰렛 멈춤 시점을 완벽하게 일치시키려면 시계 동기화가 필수입니다.</li>
+            </ul>
+
+            <h3 style="color:#1565c0; margin-top:25px;">2. 🎉 룰렛 이벤트 진행 순서</h3>
+            <ul style="font-size:14px; line-height:1.6; color:#444;">
+                <li><strong>슈팅시간 설정:</strong> 룰렛이 멈출 목표 시간을 지정합니다. (+50초, +60초 버튼 활용)</li>
+                <li><strong>시작 버튼:</strong> 누르는 즉시 접속된 모든 게스트 화면에서 룰렛 회전 및 카운트다운이 시작됩니다.</li>
+                <li><strong>결과 발표:</strong> 타이머가 0초가 되면 모든 게스트 화면에서 룰렛이 동시에 멈추며 당첨자가 노출됩니다.</li>
+            </ul>
+
+            <h3 style="color:#ff9800; margin-top:25px;">3. 👥 명단 및 사은품 관리 방식</h3>
+            <ul style="font-size:14px; line-height:1.6; color:#444;">
+                <li><strong>참가명단:</strong> 각 줄에 <code>별명 숫자</code> 형태로 입력합니다. 숫자는 추첨 시 차지하는 지분(확률)입니다.</li>
+                <li><strong>저장 버튼:</strong> 정보를 수정한 뒤에는 반드시 하단의 <strong>저장</strong> 버튼을 눌러야 게스트에게 반영됩니다.</li>
+                <li><strong>사은품 ↔ 당첨자:</strong> 당첨자가 나올 때마다 <code>사은품: 당첨자</code> 형태로 자동 기록되며, 필요시 운영자가 수기로 편집할 수 있습니다.</li>
+            </ul>
+            
+            <div style="text-align:center; margin-top:30px;">
+                <button type="button" onclick="document.getElementById('guide-modal').style.display='none'" style="padding:10px 30px; background-color:#1565c0; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer; font-size:16px;">확인 (닫기)</button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
