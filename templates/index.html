@@ -448,21 +448,27 @@
             }
 
             #prize-right-col {
-                margin-left: 0;
-                margin-top: 14px;
-                width: min(100%, 600px);
-                max-width: 100%;
-                min-width: 0;
-                height: auto;
-                order: 2;
+                display: contents; /* 모바일에서는 개별 요소로 분리하여 order 적용 */
             }
 
             /* 모바일에서는 카드 본문이 0 높이로 접히지 않도록 flex-grow 해제 */
             #prize-container,
             #memo-container {
+                margin-left: 0;
+                margin-top: 14px;
+                width: min(100%, 600px);
+                max-width: 100%;
                 flex: 0 0 auto;
                 min-height: 220px;
                 height: auto;
+            }
+
+            #prize-container {
+                order: 2;
+            }
+
+            #memo-container {
+                order: 4;
             }
 
             #prize-list,
