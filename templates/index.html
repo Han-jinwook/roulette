@@ -1328,6 +1328,9 @@
                 <button id="plus-minute-button" type="button">+60초</button>
                 <button id="plus-45sec-button" type="button">+45초</button>
                 <button id="start-button" onclick="startRotation()">시작</button>
+                <button id="btn-auto-draw" type="button" onclick="opOpenAutoDrawModal()" style="margin-left: 8px; background-color: #673ab7; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 8px 18px; font-size: 14px; font-weight: bold;" title="설정한 대시보드 옵션대로 남은 사은품들을 연달아 자동 추첨합니다.">Auto 연속 추첨</button>
+                <button id="btn-auto-pause" type="button" onclick="opToggleAutoDrawPause()" style="display:none; margin-left: 6px; background-color: #ff9800; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 8px 18px; font-size: 14px; font-weight: bold;">일시정지</button>
+                <button id="btn-auto-stop" type="button" onclick="opStopAutoDraw()" style="display:none; margin-left: 6px; background-color: #d32f2f; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 8px 18px; font-size: 14px; font-weight: bold;">연속추첨 중지</button>
             </div>
             <div class="time-control-item">
                 <span class="time-label">남은시간:</span>
@@ -2045,6 +2048,9 @@
                 confirmPopover.style.display = 'none';
             }
             if (isConfirm) {
+                if (typeof window.opStopAutoDraw === 'function') {
+                    window.opStopAutoDraw();
+                }
                 if (typeof socket !== 'undefined' && socket) {
                     socket.emit('reset_game');
                 }
@@ -2284,6 +2290,153 @@
             if (btn) {
                 btn.textContent = isDesc ? '▼ 티켓수 정렬' : '▲ 티켓수 정렬';
             }
+        };
+
+        window._autoDrawActive = false;
+        window._autoDrawPaused = false;
+        window._autoDrawDuration = 60;
+        window._autoDrawRestTime = 10;
+
+        window.opOpenAutoDrawModal = function() {
+            if (window._autoDrawActive) {
+                alert('이미 Auto 연속 추첨이 활성화 상태입니다.');
+                return;
+            }
+            document.getElementById('auto-draw-modal').style.display = 'flex';
+        };
+
+        window.opSaveAutoDrawSettings = function() {
+            var durSelect = document.getElementById('auto-draw-duration');
+            var restInput = document.getElementById('auto-draw-rest');
+            
+            window._autoDrawDuration = durSelect ? parseInt(durSelect.value, 10) : 60;
+            window._autoDrawRestTime = restInput ? parseInt(restInput.value, 10) : 10;
+            if (isNaN(window._autoDrawDuration) || window._autoDrawDuration < 45) window._autoDrawDuration = 60;
+            if (isNaN(window._autoDrawRestTime) || window._autoDrawRestTime < 5) window._autoDrawRestTime = 10;
+            
+            document.getElementById('auto-draw-modal').style.display = 'none';
+            
+            window._autoDrawActive = true;
+            window._autoDrawPaused = false;
+            
+            var autoBtn = document.getElementById('btn-auto-draw');
+            var pauseBtn = document.getElementById('btn-auto-pause');
+            var stopBtn = document.getElementById('btn-auto-stop');
+            
+            if (autoBtn) {
+                autoBtn.innerText = '연속추첨 실행중';
+                autoBtn.style.backgroundColor = '#4caf50';
+                autoBtn.disabled = true;
+            }
+            if (pauseBtn) {
+                pauseBtn.style.display = 'inline-block';
+                pauseBtn.innerText = '일시정지';
+                pauseBtn.style.backgroundColor = '#ff9800';
+            }
+            if (stopBtn) {
+                stopBtn.style.display = 'inline-block';
+            }
+            
+            if (!window._gameIsActive) {
+                opTriggerNextAutoDraw();
+            }
+        };
+
+        window.opStopAutoDraw = function() {
+            window._autoDrawActive = false;
+            window._autoDrawPaused = false;
+            if (window._cooldownInterval) {
+                clearInterval(window._cooldownInterval);
+                window._cooldownInterval = null;
+            }
+            
+            var autoBtn = document.getElementById('btn-auto-draw');
+            var pauseBtn = document.getElementById('btn-auto-pause');
+            var stopBtn = document.getElementById('btn-auto-stop');
+            var startBtn = document.getElementById('start-button');
+            var targetTimeInput = document.getElementById('target-time');
+            
+            if (autoBtn) {
+                autoBtn.innerText = 'Auto 연속 추첨';
+                autoBtn.style.backgroundColor = '#673ab7';
+                autoBtn.disabled = false;
+            }
+            if (pauseBtn) pauseBtn.style.display = 'none';
+            if (stopBtn) stopBtn.style.display = 'none';
+            
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.innerText = '시작';
+            }
+            if (targetTimeInput) targetTimeInput.disabled = false;
+            if (typeof setTimeAdjustButtonsDisabled === 'function') setTimeAdjustButtonsDisabled(false);
+            
+            console.log("Auto 연속 추첨 중지됨");
+        };
+
+        window.opToggleAutoDrawPause = function() {
+            if (!window._autoDrawActive) return;
+            
+            var pauseBtn = document.getElementById('btn-auto-pause');
+            var startBtn = document.getElementById('start-button');
+            
+            if (window._autoDrawPaused) {
+                window._autoDrawPaused = false;
+                if (pauseBtn) {
+                    pauseBtn.innerText = '일시정지';
+                    pauseBtn.style.backgroundColor = '#ff9800';
+                }
+                if (startBtn && window._cooldownRemaining > 0) {
+                    startBtn.innerText = '대기 중 (' + window._cooldownRemaining + '초)';
+                }
+                if (window._runCooldownStep) {
+                    if (window._cooldownInterval) clearInterval(window._cooldownInterval);
+                    window._cooldownInterval = setInterval(window._runCooldownStep, 1000);
+                }
+            } else {
+                window._autoDrawPaused = true;
+                if (pauseBtn) {
+                    pauseBtn.innerText = '재개';
+                    pauseBtn.style.backgroundColor = '#4caf50';
+                }
+                if (startBtn && window._cooldownRemaining > 0) {
+                    startBtn.innerText = '대기 중 (' + window._cooldownRemaining + '초) - 일시정지';
+                }
+                if (window._cooldownInterval) {
+                    clearInterval(window._cooldownInterval);
+                    window._cooldownInterval = null;
+                }
+            }
+        };
+
+        function opCheckIfAllPrizesHaveWinners() {
+            var prizesInput = document.getElementById('op-prizes');
+            var prizesText = prizesInput ? prizesInput.value : '';
+            var winnersText = window._opCurrentWinners || '';
+            var pList = opSplitText(prizesText);
+            var wList = opSplitText(winnersText);
+            return wList.length >= pList.length;
+        }
+
+        window.opTriggerNextAutoDraw = function() {
+            if (!window._autoDrawActive || window._autoDrawPaused) return;
+            
+            if (opCheckIfAllPrizesHaveWinners()) {
+                console.log("모든 사은품 당첨 완료 -> 자동 종료 실행");
+                opStopAutoDraw();
+                if (typeof opEndRouletteEvent === 'function') {
+                    opEndRouletteEvent();
+                }
+                return;
+            }
+            
+            const targetTimeInput = document.getElementById('target-time');
+            const startBtn = document.getElementById('start-button');
+            if (targetTimeInput) targetTimeInput.disabled = false;
+            if (startBtn) startBtn.disabled = false;
+            
+            addSecondsToTargetTime(window._autoDrawDuration, '+' + window._autoDrawDuration + '초');
+            startRotation();
         };
 
         window.opSave = function () {
@@ -4433,21 +4586,32 @@
                     if (targetTimeInput) targetTimeInput.disabled = true;
                     if (typeof setTimeAdjustButtonsDisabled === 'function') setTimeAdjustButtonsDisabled(true);
 
-                    let cooldown = 10;
+                    let cooldown = window._autoDrawActive ? window._autoDrawRestTime : 10;
                     startButton.innerText = `대기 중 (${cooldown}초)`;
 
-                    const cooldownInterval = setInterval(() => {
-                        cooldown -= 1;
-                        if (cooldown <= 0) {
-                            clearInterval(cooldownInterval);
+                    if (window._cooldownInterval) clearInterval(window._cooldownInterval);
+                    window._cooldownRemaining = cooldown;
+
+                    window._runCooldownStep = function() {
+                        window._cooldownRemaining -= 1;
+                        if (window._cooldownRemaining <= 0) {
+                            clearInterval(window._cooldownInterval);
+                            window._cooldownInterval = null;
                             startButton.disabled = false;
                             startButton.innerText = '시작';
                             if (targetTimeInput) targetTimeInput.disabled = false;
                             if (typeof setTimeAdjustButtonsDisabled === 'function') setTimeAdjustButtonsDisabled(false);
+
+                            if (window._autoDrawActive && !window._autoDrawPaused) {
+                                opTriggerNextAutoDraw();
+                            }
                         } else {
-                            startButton.innerText = `대기 중 (${cooldown}초)`;
+                            var pauseSuffix = window._autoDrawPaused ? ' - 일시정지' : '';
+                            startButton.innerText = `대기 중 (${window._cooldownRemaining}초)${pauseSuffix}`;
                         }
-                    }, 1000);
+                    };
+
+                    window._cooldownInterval = setInterval(window._runCooldownStep, 1000);
                 }
 
                 // congratulation 요소 null 체크
@@ -5406,6 +5570,30 @@
             
             <div style="text-align:center; margin-top:30px;">
                 <button type="button" onclick="document.getElementById('guide-modal').style.display='none'" style="padding:10px 30px; background-color:#1565c0; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer; font-size:16px;">확인 (닫기)</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Auto Draw Setting Modal -->
+    <div id="auto-draw-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+        <div style="background:white; padding:24px; border-radius:10px; width:340px; box-shadow:0 4px 20px rgba(0,0,0,0.3); position:relative;">
+            <h3 style="margin-top:0; color:#333; font-size:18px;">⚙️ Auto 연속 추첨 설정</h3>
+            <div style="margin-top:16px;">
+                <label style="display:block; font-size:13px; font-weight:bold; color:#555; margin-bottom:6px;">1. 회차당 추가 시간 (45초 ~ 120초)</label>
+                <select id="auto-draw-duration" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+                    <option value="60">1분 (60초)</option>
+                    <option value="45">45초</option>
+                    <option value="90">1분 30초 (90초)</option>
+                    <option value="120">2분 (120초)</option>
+                </select>
+            </div>
+            <div style="margin-top:16px;">
+                <label style="display:block; font-size:13px; font-weight:bold; color:#555; margin-bottom:6px;">2. 당첨 후 휴식 시간 (초)</label>
+                <input type="number" id="auto-draw-rest" value="10" min="5" max="60" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;" />
+            </div>
+            <div style="margin-top:24px; display:flex; gap:10px;">
+                <button type="button" onclick="opSaveAutoDrawSettings()" style="flex:1; padding:10px; background-color:#673ab7; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:14px; margin:0;">저장 및 시작</button>
+                <button type="button" onclick="document.getElementById('auto-draw-modal').style.display='none'" style="flex:1; padding:10px; background-color:#888; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:14px; margin:0;">취소</button>
             </div>
         </div>
     </div>
