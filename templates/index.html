@@ -2084,8 +2084,8 @@
                 var line = lines[i].trim();
                 if (!line) continue;
                 
-                // 1. Remove list bullets/numbers at start (e.g. "1. ", "2) ", "- ", "* ", "• ")
-                line = line.replace(/^[\d+.\-*•)\s]+(번)?[:.\-s]*/, '').trim();
+                // 1. Remove list bullets/numbers at start ONLY when followed by a list delimiter (e.g. "1. ", "2) ", "- ", "* ", "• ")
+                line = line.replace(/^(\d+\s*[.)\-:]|[\-*•])\s*/, '').trim();
                 
                 // 2. Extract nickname and ticket count
                 var count = 1;
