@@ -4344,6 +4344,14 @@
                 }
                 if (typeof setTimeAdjustButtonsDisabled === 'function') setTimeAdjustButtonsDisabled(true);
 
+                var pauseBtn = document.getElementById('btn-auto-pause');
+                if (pauseBtn) {
+                    pauseBtn.disabled = true;
+                    pauseBtn.style.opacity = '0.5';
+                    pauseBtn.style.cursor = 'not-allowed';
+                    pauseBtn.title = '룰렛이 돌고 있을 때는 일시정지할 수 없습니다. 대기 시간에만 일시정지가 가능합니다.';
+                }
+
                 // [추가] 새 게임 시작 시 이전 당첨자 오버레이 숨기기
                 const winnerOverlay = document.getElementById('winner-overlay');
                 if (winnerOverlay) {
@@ -4586,6 +4594,16 @@
 
                     let cooldown = window._autoDrawActive ? window._autoDrawRestTime : 10;
                     startButton.innerText = `대기 중 (${cooldown}초)`;
+
+                    var pauseBtn = document.getElementById('btn-auto-pause');
+                    if (pauseBtn) {
+                        pauseBtn.disabled = false;
+                        pauseBtn.style.opacity = '1';
+                        pauseBtn.style.cursor = 'pointer';
+                        pauseBtn.title = '';
+                        pauseBtn.innerText = '일시정지';
+                        pauseBtn.style.backgroundColor = '#ff9800';
+                    }
 
                     if (window._cooldownInterval) clearInterval(window._cooldownInterval);
                     window._cooldownRemaining = cooldown;
