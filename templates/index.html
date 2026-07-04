@@ -1530,9 +1530,12 @@
         </div>
         <div class="op-row" style="display:flex; gap:12px; align-items:stretch;">
             <div style="flex:1; min-width:0;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px; flex-wrap:wrap; gap:8px;">
                     <label style="margin:0;">참가 명단 (별명 + 티켓 수) <span id="op-allowed-count" style="font-weight:700;color:#1565c0;">0명</span></label>
-                    <div style="display:flex; gap:6px;">
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <span style="font-size:11px; color:#666; font-weight:bold;">모드:</span>
+                        <label style="font-size:11px; margin:0; cursor:pointer; font-weight:normal; display:inline-flex; align-items:center; gap:2px;"><input type="radio" name="op-parse-mode" value="names-only" checked style="margin:0; vertical-align:middle;" />명단만</label>
+                        <label style="font-size:11px; margin:0; cursor:pointer; font-weight:normal; display:inline-flex; align-items:center; gap:2px; margin-right:4px;"><input type="radio" name="op-parse-mode" value="name-count" style="margin:0; vertical-align:middle;" />명단+티켓수</label>
                         <button type="button" style="padding: 2px 8px; font-size: 11px; background-color: #616161; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="opCleanAllowedListText()" title="난잡한 형식의 명단에서 이름과 숫자를 자동으로 추출하여 깔끔하게 정리합니다.">🪄 자동 명단 정리</button>
                         <button type="button" style="padding: 2px 8px; font-size: 11px; background-color: #78909c; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="opSortAllowedListText()" title="명단을 가나다/알파벳 순서로 정렬합니다.">↕️ 정렬</button>
                     </div>
@@ -2077,49 +2080,111 @@
                 return;
             }
             
+            var mode = 'names-only';
+            var radios = document.getElementsByName('op-parse-mode');
+            for (var r = 0; r < radios.length; r++) {
+                if (radios[r].checked) {
+                    mode = radios[r].value;
+                    break;
+                }
+            }
+            
             var lines = text.split(/\r?\n/);
+            var tempLines = [];
+            for (var i = 0; i < lines.length; i++) {
+                var l = lines[i].trim();
+                if (l) tempLines.push(l);
+            }
+            
             var cleanedLines = [];
             
-            for (var i = 0; i < lines.length; i++) {
-                var line = lines[i].trim();
-                if (!line) continue;
-                
-                // 1. Remove list bullets/numbers at start ONLY when followed by a list delimiter (e.g. "1. ", "2) ", "- ", "* ", "• ")
-                line = line.replace(/^(\d+\s*[.)\-:]|[\-*•])\s*/, '').trim();
-                
-                // 2. Extract nickname and ticket count
-                var count = 1;
-                // Matches optional punctuation/spaces/Korean words for count, e.g. "(티켓 3)", " 3개", " - 3"
-                var numRegex = /[\s(:,\-~_#]+(\d+)\s*(?:장|개|개수|명|티켓|ticket|T)?\s*\)?$/i;
-                var match = line.match(numRegex);
-                
-                var name = line;
-                if (match) {
-                    var parsedCount = parseInt(match[1], 10);
-                    if (!isNaN(parsedCount) && parsedCount > 0) {
-                        count = parsedCount;
+            if (mode === 'names-only') {
+                // Mode 1: Names only. Default count is 1. Strip trailing numbers.
+                for (var i = 0; i < tempLines.length; i++) {
+                    var line = tempLines[i];
+                    line = line.replace(/^(\d+\s*[.)\-:]|[\-*•])\s*/, '').trim();
+                    
+                    var numRegex = /[\s(:,\-~_#]+(\d+)\s*(?:장|개|개수|명|티켓|ticket|T)?\s*\)?$/i;
+                    var match = line.match(numRegex);
+                    var name = line;
+                    if (match) {
                         name = line.substring(0, match.index).trim();
-                    }
-                } else {
-                    // Check if there is a number at the end
-                    var endNumMatch = line.match(/\s+(\d+)$/);
-                    if (endNumMatch) {
-                        var parsedCount = parseInt(endNumMatch[1], 10);
-                        if (!isNaN(parsedCount) && parsedCount > 0) {
-                            count = parsedCount;
+                    } else {
+                        var endNumMatch = line.match(/\s+(\d+)$/);
+                        if (endNumMatch) {
                             name = line.substring(0, endNumMatch.index).trim();
+                        }
+                    }
+                    name = name.replace(/^[\s(:\-,_#]+/, '').replace(/[\s):\-,_#]+$/, '').trim();
+                    name = name.replace(/\s+/g, '');
+                    if (name) {
+                        cleanedLines.push(name + ' 1');
+                    }
+                }
+            } else {
+                // Mode 2: Name + Ticket Count.
+                // Auto-detect alternating lines (Line 0: Name, Line 1: Count...)
+                var isAlternating = tempLines.length >= 2;
+                if (isAlternating) {
+                    for (var i = 1; i < tempLines.length; i += 2) {
+                        var val = tempLines[i].replace(/[^0-9]/g, '');
+                        if (!val || isNaN(parseInt(val, 10))) {
+                            isAlternating = false;
+                            break;
                         }
                     }
                 }
                 
-                // Clean name: remove trailing/leading parentheses or punctuation
-                name = name.replace(/^[\s(:\-,_#]+/, '').replace(/[\s):\-,_#]+$/, '').trim();
-                
-                // 3. 별명 내부의 모든 공백 제거 (파싱 에러 방지)
-                name = name.replace(/\s+/g, '');
-                
-                if (name) {
-                    cleanedLines.push(name + ' ' + count);
+                if (isAlternating) {
+                    for (var i = 0; i < tempLines.length; i += 2) {
+                        var nameLine = tempLines[i];
+                        var countLine = tempLines[i+1] || '1';
+                        
+                        nameLine = nameLine.replace(/^(\d+\s*[.)\-:]|[\-*•])\s*/, '').trim();
+                        nameLine = nameLine.replace(/^[\s(:\-,_#]+/, '').replace(/[\s):\-,_#]+$/, '').trim();
+                        nameLine = nameLine.replace(/\s+/g, '');
+                        
+                        var count = parseInt(countLine.replace(/[^0-9]/g, ''), 10);
+                        if (isNaN(count) || count <= 0) count = 1;
+                        
+                        if (nameLine) {
+                            cleanedLines.push(nameLine + ' ' + count);
+                        }
+                    }
+                } else {
+                    for (var i = 0; i < tempLines.length; i++) {
+                        var line = tempLines[i];
+                        line = line.replace(/^(\d+\s*[.)\-:]|[\-*•])\s*/, '').trim();
+                        
+                        var count = 1;
+                        var numRegex = /[\s(:,\-~_#]+(\d+)\s*(?:장|개|개수|명|티켓|ticket|T)?\s*\)?$/i;
+                        var match = line.match(numRegex);
+                        var name = line;
+                        
+                        if (match) {
+                            var parsedCount = parseInt(match[1], 10);
+                            if (!isNaN(parsedCount) && parsedCount > 0) {
+                                count = parsedCount;
+                                name = line.substring(0, match.index).trim();
+                            }
+                        } else {
+                            var endNumMatch = line.match(/\s+(\d+)$/);
+                            if (endNumMatch) {
+                                var parsedCount = parseInt(endNumMatch[1], 10);
+                                if (!isNaN(parsedCount) && parsedCount > 0) {
+                                    count = parsedCount;
+                                    name = line.substring(0, endNumMatch.index).trim();
+                                }
+                            }
+                        }
+                        
+                        name = name.replace(/^[\s(:\-,_#]+/, '').replace(/[\s):\-,_#]+$/, '').trim();
+                        name = name.replace(/\s+/g, '');
+                        
+                        if (name) {
+                            cleanedLines.push(name + ' ' + count);
+                        }
+                    }
                 }
             }
             
@@ -2154,7 +2219,10 @@
             window._allowedListSortDir = isAsc ? 'asc' : 'desc';
             
             validLines.sort(function(a, b) {
-                var res = a.localeCompare(b, 'ko', { sensitivity: 'base' });
+                // Compare only by nickname (excluding the trailing space and number)
+                var nameA = a.replace(/\s+\d+$/, '').trim();
+                var nameB = b.replace(/\s+\d+$/, '').trim();
+                var res = nameA.localeCompare(nameB, 'ko', { sensitivity: 'base' });
                 return isAsc ? res : -res;
             });
             
