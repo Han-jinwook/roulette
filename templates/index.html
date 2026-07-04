@@ -1323,7 +1323,7 @@
                 <span id="current-time" class="time-value"></span>
             </div>
             <div class="time-control-item">
-                <span class="time-label">슈팅시간 설정:</span>
+                <span class="time-label">슛 타임 설정:</span>
                 <input type="text" id="target-time" placeholder="HH:MM:SS" value="">
                 <button id="plus-minute-button" type="button">+60초</button>
                 <button id="plus-45sec-button" type="button">+45초</button>
@@ -1349,7 +1349,7 @@
                 </div>
                 <div class="time-control-item"
                     style="background-color: rgba(76, 175, 80, 0.2); padding: 8px 15px; border-radius: 8px; border: 1px solid #4CAF50;">
-                    <span class="time-label" style="color: #2e7d32;">슈팅시간:</span>
+                    <span class="time-label" style="color: #2e7d32;">슛 타임:</span>
                     <span id="guest-target-time-display" class="time-value" style="font-weight: bold;">--:--:--</span>
                 </div>
                 <div class="time-control-item"
@@ -1524,7 +1524,7 @@
             <label><input type="checkbox" id="op-allow-dup" {% if allow_duplicates_dash %}checked{% endif %} /> 중복 당첨 허용</label>
         </div>
         <div class="op-row" style="border-top:1px solid #e0e0e0;padding-top:16px;margin-top:12px;">
-            <label>룰렛 현장 종료 <span style="font-weight:400;color:#888">(원판 중앙 안내 표시 · 시작·+60초/+45초·슈팅시간 입력 비활성 · 게스트 화면 동기화)</span></label>
+            <label>룰렛 현장 종료 <span style="font-weight:400;color:#888">(원판 중앙 안내 표시 · 시작·+60초/+45초·슛 타임 입력 비활성 · 게스트 화면 동기화)</span></label>
             <input type="text" id="op-roulette-end-message" placeholder="오늘 룰렛 이벤트 종료! 감사합니다" maxlength="500" style="width:100%;max-width:560px;margin-top:8px;padding:8px 10px;border-radius:6px;border:1px solid #ccc;" />
             <div style="margin-top:10px;">
                 <button type="button" class="op-btn-end-roulette" id="op-roulette-end-btn" onclick="opEndRouletteEvent()">룰렛 종료</button>
@@ -4120,7 +4120,7 @@
             localDate.setHours(localH, localM, localS, 0);
             const leadMs = localDate.getTime() - Date.now();
             if (leadMs <= 30000) {
-                showStartToast('슈팅시간은 현재시각 기준 30초 이상으로 설정해 주세요. (권장: 30초~1분)');
+                showStartToast('슛 타임은 현재시각 기준 30초 이상으로 설정해 주세요. (권장: 30초~1분)');
                 startRequestInFlight = false;
                 startBtn.disabled = false;
                 startBtn.innerText = '시작';
@@ -4449,7 +4449,7 @@
                 const guestTargetTimeDisplay = document.getElementById('guest-target-time-display');
                 if (guestTargetTimeDisplay) {
                     guestTargetTimeDisplay.innerText = targetTimeString;
-                    console.log("게스트 슈팅시간 업데이트:", targetTimeString);
+                    console.log("게스트 슛 타임 업데이트:", targetTimeString);
                 }
 
                 const adjustedFinalAngle = finalAngle + ROULETTE_ANGLE_COMP_DEG;
@@ -4703,7 +4703,7 @@
                     // 애니메이션 효과 (CSS에 정의된 winner-popup 사용)
                     winnerOverlay.style.animation = 'winner-popup 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
 
-                    // [수정] 자동으로 숨기거나 새로고침하지 않음 (사용자 요청: 슈팅시간 설정 전까지 유지)
+                    // [수정] 자동으로 숨기거나 새로고침하지 않음 (사용자 요청: 슛 타임 설정 전까지 유지)
                     console.log('당첨자 오버레이 표시 유지 (수동 리셋 대기)');
                 }
 
@@ -5040,7 +5040,7 @@
                         const guestTargetTimeDisplay = document.getElementById('guest-target-time-display');
                         if (guestTargetTimeDisplay) {
                             guestTargetTimeDisplay.innerText = targetTimeString;
-                            console.log("게스트 슈팅시간 설정:", targetTimeString);
+                            console.log("게스트 슛 타임 설정:", targetTimeString);
                         }
 
                         // 남은 시간 업데이트 
@@ -5609,7 +5609,7 @@
 
             <h3 style="color:#1565c0; margin-top:25px;">2. 🎉 룰렛 이벤트 진행 순서</h3>
             <ul style="font-size:14px; line-height:1.6; color:#444;">
-                <li><strong>슈팅시간 설정:</strong> 룰렛이 멈출 목표 시간을 지정합니다. (+60초, +45초 버튼 활용)</li>
+                <li><strong>슛 타임 설정:</strong> 룰렛이 멈출 목표 시간을 지정합니다. (+60초, +45초 버튼 활용)</li>
                 <li><strong>시작 버튼:</strong> 누르는 즉시 접속된 모든 게스트 화면에서 룰렛 회전 및 카운트다운이 시작됩니다.</li>
                 <li><strong>결과 발표:</strong> 타이머가 0초가 되면 모든 게스트 화면에서 룰렛이 동시에 멈추며 당첨자가 노출됩니다.</li>
             </ul>
