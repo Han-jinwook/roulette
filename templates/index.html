@@ -4072,6 +4072,7 @@
                 animationFrameId = requestAnimationFrame(animate);
 
                 setTimeout(() => {
+                    if (!window._gameIsActive) return;
                     if (!animationCompleted) {
                         cancelAnimationFrame(animationFrameId);
 
@@ -4314,6 +4315,9 @@
                 }
 
                 stopAllSounds();
+
+                const prizeItems = document.querySelectorAll('.prize-item');
+                prizeItems.forEach(item => item.classList.remove('drawing-active'));
 
                 if (countdownInterval) {
                     clearInterval(countdownInterval);
@@ -4621,6 +4625,7 @@
 
                             // 안전 장치: 남은 시간 + 최소 여유 시간 후 애니메이션 강제 종료
                             setTimeout(() => {
+                                if (!window._gameIsActive) return;
                                 if (animationFrameId) {
                                     cancelAnimationFrame(animationFrameId);
                                     document.getElementById('rotating-container').style.transform =
