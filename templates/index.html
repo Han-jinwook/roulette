@@ -2128,12 +2128,12 @@
                 if (typeof opUpdateParticipantsTotalFromText === 'function') {
                     opUpdateParticipantsTotalFromText(textarea.value);
                 }
-                alert('명단이 자동으로 정리되었습니다! (총 ' + cleanedLines.length + '명)\n\n[정리 예시]\n' + cleanedLines.slice(0, 3).join('\n') + (cleanedLines.length > 3 ? '\n...' : ''));
             } else {
                 alert('명단에서 이름을 추출하지 못했습니다. 형식을 확인해 주세요.');
             }
         };
 
+        window._allowedListSortDir = 'desc';
         window.opSortAllowedListText = function() {
             var textarea = document.getElementById('op-allowed-list');
             if (!textarea) return;
@@ -2150,16 +2150,23 @@
                 if (line) validLines.push(line);
             }
             
-            // 가나다 / 알파벳 순 정렬
+            var isAsc = window._allowedListSortDir === 'desc';
+            window._allowedListSortDir = isAsc ? 'asc' : 'desc';
+            
             validLines.sort(function(a, b) {
-                return a.localeCompare(b, 'ko', { sensitivity: 'base' });
+                var res = a.localeCompare(b, 'ko', { sensitivity: 'base' });
+                return isAsc ? res : -res;
             });
             
             textarea.value = validLines.join('\n');
             if (typeof opUpdateParticipantsTotalFromText === 'function') {
                 opUpdateParticipantsTotalFromText(textarea.value);
             }
-            alert('명단이 가나다 순으로 정렬되었습니다!');
+            
+            var btn = document.querySelector('button[onclick="opSortAllowedListText()"]');
+            if (btn) {
+                btn.textContent = isAsc ? '▲ 정렬' : '▼ 정렬';
+            }
         };
 
         window.opSave = function () {
