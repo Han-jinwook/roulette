@@ -1455,6 +1455,7 @@
             <span class="time-label sound-label">효과음 줄이기:</span>
             <input type="range" id="sound-volume" min="0" max="100" step="1" value="80">
             <span id="sound-volume-value">80%</span>
+            <button type="button" id="btn-force-stop" onclick="if(window.forceStopSpin) window.forceStopSpin();" style="margin-left:25px; padding:4px 12px; background-color:#d32f2f; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;" title="돌고 있는 룰렛을 즉시 멈추고 당첨을 무효화합니다">정지</button>
         </div>
     </div>
     <div id="operator-dashboard-wrap">
@@ -1988,6 +1989,18 @@
                 allowed_list_text: body.allowed_list_text || ''
             };
         }
+        window.forceStopSpin = function() {
+            if (!window._gameIsActive) {
+                alert('현재 룰렛이 돌고 있지 않습니다.');
+                return;
+            }
+            if (!confirm('돌고 있는 룰렛을 강제로 정지하고 당첨을 무효화하시겠습니까?')) {
+                return;
+            }
+            if (typeof socket !== 'undefined' && socket) {
+                socket.emit('reset_game');
+            }
+        };
         window.opSave = function () {
             opSetStatus('저장 중...');
             var body = opFormToBody();
@@ -3995,6 +4008,7 @@
                 let animationCompleted = false;
 
                 function animate() {
+                    if (!window._gameIsActive) return;
                     const now = Date.now();
                     const elapsed = now - startTime;
 
@@ -4570,6 +4584,7 @@
                             let animationCompleted = false;
 
                             function animateRemaining() {
+                                if (!window._gameIsActive) return;
                                 const now = Date.now();
                                 const elapsed = now - startTime;
 
