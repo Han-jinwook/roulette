@@ -2112,6 +2112,9 @@
                 // Clean name: remove trailing/leading parentheses or punctuation
                 name = name.replace(/^[\s(:\-,_#]+/, '').replace(/[\s):\-,_#]+$/, '').trim();
                 
+                // 3. 별명 내부의 모든 공백 제거 (파싱 에러 방지)
+                name = name.replace(/\s+/g, '');
+                
                 if (name) {
                     cleanedLines.push(name + ' ' + count);
                 }
