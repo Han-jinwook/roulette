@@ -1530,15 +1530,19 @@
         </div>
         <div class="op-row" style="display:flex; gap:12px; align-items:stretch;">
             <div style="flex:1; min-width:0;">
-                <label>참가 명단 (별명 + 티켓 수) <span id="op-allowed-count" style="font-weight:700;color:#1565c0;">0명</span></label>
-                <textarea id="op-allowed-list">{{ allowed_list_text or '' }}</textarea>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                    <label style="margin:0;">참가 명단 (별명 + 티켓 수) <span id="op-allowed-count" style="font-weight:700;color:#1565c0;">0명</span></label>
+                    <button type="button" style="padding: 2px 8px; font-size: 11px; background-color: #616161; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px;" onclick="opCleanAllowedListText()" title="난잡한 형식의 명단에서 이름과 숫자를 자동으로 추출하여 깔끔하게 정리합니다.">🪄 자동 명단 정리</button>
+                </div>
+                <textarea id="op-allowed-list" style="margin-top:0;">{{ allowed_list_text or '' }}</textarea>
             </div>
             <div style="flex:1; min-width:0;">
                 <label>당첨자 명단 (사은품 ↔ 당첨자)</label>
                 <select id="op-winners-list" size="9" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"></select>
-                <div style="margin-top:8px; display:flex; gap:8px;">
-                    <button type="button" class="op-btn-reset" style="flex:1;" onclick="opResetWinnersOnly()">당첨자 리셋</button>
-                    <button type="button" class="op-btn-delete" style="flex:1;" onclick="opDeleteSelectedWinner()">선택 삭제</button>
+                <div style="margin-top:8px; display:flex; gap:8px; flex-wrap: wrap;">
+                    <button type="button" class="op-btn-reset" style="flex:1; min-width:80px;" onclick="opResetWinnersOnly()">당첨자 리셋</button>
+                    <button type="button" class="op-btn-delete" style="flex:1; min-width:80px;" onclick="opDeleteSelectedWinner()">선택 삭제</button>
+                    <button type="button" id="btn-copy-winners" style="flex:1; min-width:80px; padding:6px 12px; background-color:#1976d2; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer; font-size:12px; margin:0;" onclick="opCopyWinnersToClipboard()">명단 복사</button>
                 </div>
             </div>
         </div>
@@ -2035,6 +2039,92 @@
                 if (typeof socket !== 'undefined' && socket) {
                     socket.emit('reset_game');
                 }
+            }
+        };
+
+        window.opCopyWinnersToClipboard = function() {
+            var sel = document.getElementById('op-winners-list');
+            if (!sel) return;
+            var textLines = [];
+            for (var i = 0; i < sel.options.length; i++) {
+                var opt = sel.options[i];
+                if (opt.value !== '' && !opt.disabled && opt.textContent.indexOf('->') > 0) {
+                    // Extract text like "1. Prize -> Winner"
+                    textLines.push(opt.textContent);
+                }
+            }
+            if (textLines.length === 0) {
+                alert('복사할 당첨자 내역이 없습니다.');
+                return;
+            }
+            var textToCopy = textLines.join('\n');
+            navigator.clipboard.writeText(textToCopy).then(function() {
+                alert('당첨자 명단이 클립보드에 복사되었습니다!\n\n' + textToCopy);
+            }).catch(function(err) {
+                alert('복사에 실패했습니다: ' + err);
+            });
+        };
+
+        window.opCleanAllowedListText = function() {
+            var textarea = document.getElementById('op-allowed-list');
+            if (!textarea) return;
+            var text = textarea.value;
+            if (!text.trim()) {
+                alert('정리할 명단이 비어 있습니다.');
+                return;
+            }
+            
+            var lines = text.split(/\r?\n/);
+            var cleanedLines = [];
+            
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (!line) continue;
+                
+                // 1. Remove list bullets/numbers at start (e.g. "1. ", "2) ", "- ", "* ", "• ")
+                line = line.replace(/^[\d+.\-*•)\s]+(번)?[:.\-s]*/, '').trim();
+                
+                // 2. Extract nickname and ticket count
+                var count = 1;
+                // Matches optional punctuation/spaces/Korean words for count, e.g. "(티켓 3)", " 3개", " - 3"
+                var numRegex = /[\s(:,\-~_#]+(\d+)\s*(?:장|개|개수|명|티켓|ticket|T)?\s*\)?$/i;
+                var match = line.match(numRegex);
+                
+                var name = line;
+                if (match) {
+                    var parsedCount = parseInt(match[1], 10);
+                    if (!isNaN(parsedCount) && parsedCount > 0) {
+                        count = parsedCount;
+                        name = line.substring(0, match.index).trim();
+                    }
+                } else {
+                    // Check if there is a number at the end
+                    var endNumMatch = line.match(/\s+(\d+)$/);
+                    if (endNumMatch) {
+                        var parsedCount = parseInt(endNumMatch[1], 10);
+                        if (!isNaN(parsedCount) && parsedCount > 0) {
+                            count = parsedCount;
+                            name = line.substring(0, endNumMatch.index).trim();
+                        }
+                    }
+                }
+                
+                // Clean name: remove trailing/leading parentheses or punctuation
+                name = name.replace(/^[\s(:\-,_#]+/, '').replace(/[\s):\-,_#]+$/, '').trim();
+                
+                if (name) {
+                    cleanedLines.push(name + ' ' + count);
+                }
+            }
+            
+            if (cleanedLines.length > 0) {
+                textarea.value = cleanedLines.join('\n');
+                if (typeof opUpdateParticipantsTotalFromText === 'function') {
+                    opUpdateParticipantsTotalFromText(textarea.value);
+                }
+                alert('명단이 자동으로 정리되었습니다! (총 ' + cleanedLines.length + '명)\n\n[정리 예시]\n' + cleanedLines.slice(0, 3).join('\n') + (cleanedLines.length > 3 ? '\n...' : ''));
+            } else {
+                alert('명단에서 이름을 추출하지 못했습니다. 형식을 확인해 주세요.');
             }
         };
 
