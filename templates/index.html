@@ -1537,7 +1537,8 @@
                         <label style="font-size:11px; margin:0; cursor:pointer; font-weight:normal; display:inline-flex; align-items:center; gap:2px;"><input type="radio" name="op-parse-mode" value="names-only" checked style="margin:0; vertical-align:middle;" />명단만</label>
                         <label style="font-size:11px; margin:0; cursor:pointer; font-weight:normal; display:inline-flex; align-items:center; gap:2px; margin-right:4px;"><input type="radio" name="op-parse-mode" value="name-count" style="margin:0; vertical-align:middle;" />명단+티켓수</label>
                         <button type="button" style="padding: 2px 8px; font-size: 11px; background-color: #616161; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="opCleanAllowedListText()" title="난잡한 형식의 명단에서 이름과 숫자를 자동으로 추출하여 깔끔하게 정리합니다.">🪄 자동 명단 정리</button>
-                        <button type="button" style="padding: 2px 8px; font-size: 11px; background-color: #78909c; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="opSortAllowedListText()" title="명단을 가나다/알파벳 순서로 정렬합니다.">↕️ 정렬</button>
+                        <button type="button" style="padding: 2px 8px; font-size: 11px; background-color: #78909c; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="opSortAllowedListText()" title="명단을 가나다/알파벳 순서로 정렬합니다.">↕️ 이름 정렬</button>
+                        <button type="button" style="padding: 2px 8px; font-size: 11px; background-color: #546e7a; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="opSortAllowedListByTickets()" title="명단을 티켓 수 기준으로 정렬합니다.">↕️ 티켓수 정렬</button>
                     </div>
                 </div>
                 <textarea id="op-allowed-list" style="margin-top:0;">{{ allowed_list_text or '' }}</textarea>
@@ -2233,7 +2234,53 @@
             
             var btn = document.querySelector('button[onclick="opSortAllowedListText()"]');
             if (btn) {
-                btn.textContent = isAsc ? '▲ 정렬' : '▼ 정렬';
+                btn.textContent = isAsc ? '▲ 이름 정렬' : '▼ 이름 정렬';
+            }
+        };
+
+        window._allowedListTicketSortDir = 'asc';
+        window.opSortAllowedListByTickets = function() {
+            var textarea = document.getElementById('op-allowed-list');
+            if (!textarea) return;
+            var text = textarea.value;
+            if (!text.trim()) {
+                alert('정렬할 명단이 비어 있습니다.');
+                return;
+            }
+            
+            var lines = text.split(/\r?\n/);
+            var validLines = [];
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (line) validLines.push(line);
+            }
+            
+            var isDesc = window._allowedListTicketSortDir === 'asc';
+            window._allowedListTicketSortDir = isDesc ? 'desc' : 'asc';
+            
+            validLines.sort(function(a, b) {
+                var matchA = a.match(/\s+(\d+)$/);
+                var matchB = b.match(/\s+(\d+)$/);
+                var countA = matchA ? parseInt(matchA[1], 10) : 1;
+                var countB = matchB ? parseInt(matchB[1], 10) : 1;
+                
+                if (countA !== countB) {
+                    return isDesc ? (countB - countA) : (countA - countB);
+                }
+                
+                var nameA = a.replace(/\s+\d+$/, '').trim();
+                var nameB = b.replace(/\s+\d+$/, '').trim();
+                return nameA.localeCompare(nameB, 'ko', { sensitivity: 'base' });
+            });
+            
+            textarea.value = validLines.join('\n');
+            if (typeof opUpdateParticipantsTotalFromText === 'function') {
+                opUpdateParticipantsTotalFromText(textarea.value);
+            }
+            
+            var btn = document.querySelector('button[onclick="opSortAllowedListByTickets()"]');
+            if (btn) {
+                btn.textContent = isDesc ? '▼ 티켓수 정렬' : '▲ 티켓수 정렬';
             }
         };
 
