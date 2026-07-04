@@ -2340,12 +2340,42 @@
             }
         };
 
+        window.opShowAutoDrawCountdownToast = function(seconds, isPaused) {
+            var el = document.getElementById('start-toast-inline');
+            if (!el) return;
+            if (el._hideTimer) clearTimeout(el._hideTimer);
+            el.style.display = 'inline-block';
+            el.style.background = 'rgba(103,58,183,0.95)';
+            el.style.color = '#fff';
+            el.style.padding = '10px 14px';
+            el.style.borderRadius = '8px';
+            el.style.fontSize = '13px';
+            el.style.fontWeight = '600';
+            el.style.boxShadow = '0 4px 16px rgba(0,0,0,0.25)';
+            el.style.opacity = '1';
+            el.style.transition = 'opacity 0.2s ease';
+            
+            var pauseText = isPaused ? ' (일시정지됨)' : '';
+            el.innerText = '⏱️ [Auto] ' + seconds + '초 후 다음 추첨이 자동으로 시작됩니다.' + pauseText;
+        };
+
+        window.opHideAutoDrawCountdownToast = function() {
+            var el = document.getElementById('start-toast-inline');
+            if (!el) return;
+            el.style.opacity = '0';
+            setTimeout(function () { el.style.display = 'none'; }, 220);
+        };
+
         window.opStopAutoDraw = function() {
             window._autoDrawActive = false;
             window._autoDrawPaused = false;
             if (window._cooldownInterval) {
                 clearInterval(window._cooldownInterval);
                 window._cooldownInterval = null;
+            }
+            
+            if (typeof window.opHideAutoDrawCountdownToast === 'function') {
+                window.opHideAutoDrawCountdownToast();
             }
             
             var autoBtn = document.getElementById('btn-auto-draw');
@@ -2391,6 +2421,9 @@
                     if (window._cooldownInterval) clearInterval(window._cooldownInterval);
                     window._cooldownInterval = setInterval(window._runCooldownStep, 1000);
                 }
+                if (window._cooldownRemaining > 0 && typeof window.opShowAutoDrawCountdownToast === 'function') {
+                    window.opShowAutoDrawCountdownToast(window._cooldownRemaining, false);
+                }
             } else {
                 window._autoDrawPaused = true;
                 if (pauseBtn) {
@@ -2403,6 +2436,9 @@
                 if (window._cooldownInterval) {
                     clearInterval(window._cooldownInterval);
                     window._cooldownInterval = null;
+                }
+                if (window._cooldownRemaining > 0 && typeof window.opShowAutoDrawCountdownToast === 'function') {
+                    window.opShowAutoDrawCountdownToast(window._cooldownRemaining, true);
                 }
             }
         };
@@ -4618,12 +4654,19 @@
                             if (targetTimeInput) targetTimeInput.disabled = false;
                             if (typeof setTimeAdjustButtonsDisabled === 'function') setTimeAdjustButtonsDisabled(false);
 
+                            if (typeof window.opHideAutoDrawCountdownToast === 'function') {
+                                window.opHideAutoDrawCountdownToast();
+                            }
+
                             if (window._autoDrawActive && !window._autoDrawPaused) {
                                 opTriggerNextAutoDraw();
                             }
                         } else {
                             var pauseSuffix = window._autoDrawPaused ? ' - 일시정지' : '';
                             startButton.innerText = `대기 중 (${window._cooldownRemaining}초)${pauseSuffix}`;
+                            if (window._autoDrawActive && typeof window.opShowAutoDrawCountdownToast === 'function') {
+                                window.opShowAutoDrawCountdownToast(window._cooldownRemaining, window._autoDrawPaused);
+                            }
                         }
                     };
 
