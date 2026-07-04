@@ -2307,12 +2307,10 @@
 
         window.opSaveAutoDrawSettings = function() {
             var durSelect = document.getElementById('auto-draw-duration');
-            var restInput = document.getElementById('auto-draw-rest');
             
             window._autoDrawDuration = durSelect ? parseInt(durSelect.value, 10) : 60;
-            window._autoDrawRestTime = restInput ? parseInt(restInput.value, 10) : 10;
+            window._autoDrawRestTime = 10; // 10초 대기 시간 고정
             if (isNaN(window._autoDrawDuration) || window._autoDrawDuration < 45) window._autoDrawDuration = 60;
-            if (isNaN(window._autoDrawRestTime) || window._autoDrawRestTime < 5) window._autoDrawRestTime = 10;
             
             document.getElementById('auto-draw-modal').style.display = 'none';
             
@@ -5588,8 +5586,9 @@
                 </select>
             </div>
             <div style="margin-top:16px;">
-                <label style="display:block; font-size:13px; font-weight:bold; color:#555; margin-bottom:6px;">2. 당첨 후 휴식 시간 (초)</label>
-                <input type="number" id="auto-draw-rest" value="10" min="5" max="60" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;" />
+                <p style="font-size:12px; line-height:1.5; color:#666; margin:0;">
+                    * 당첨자 발표 후 안전한 정지 및 다음 추첨 진행을 위해 <strong>10초 대기 시간</strong>이 고정 적용됩니다.
+                </p>
             </div>
             <div style="margin-top:24px; display:flex; gap:10px;">
                 <button type="button" onclick="opSaveAutoDrawSettings()" style="flex:1; padding:10px; background-color:#673ab7; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:14px; margin:0;">저장 및 시작</button>
