@@ -2126,9 +2126,9 @@
                 // Auto-detect alternating lines (Line 0: Name, Line 1: Count...)
                 var isAlternating = tempLines.length >= 2;
                 if (isAlternating) {
+                    var countLineRegex = /^\s*\d+\s*(?:장|개|개수|명|티켓|ticket|T)?\s*$/i;
                     for (var i = 1; i < tempLines.length; i += 2) {
-                        var val = tempLines[i].replace(/[^0-9]/g, '');
-                        if (!val || isNaN(parseInt(val, 10))) {
+                        if (!countLineRegex.test(tempLines[i])) {
                             isAlternating = false;
                             break;
                         }
