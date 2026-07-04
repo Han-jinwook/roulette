@@ -819,14 +819,6 @@ def handle_start_rotation(data):
             to=request.sid,
         )
         return
-    if active_url and active_url in last_winner_confirm_times:
-        elapsed = time.time() - last_winner_confirm_times[active_url]
-        if elapsed < 10:
-            remaining = int(10 - elapsed)
-            print(f"DEBUG: Cooldown active for {active_url}. {remaining}s left.")
-            socketio.emit('error', {'message': f'당첨자 발표 후 재설정까지 대기 시간이 필요합니다. ({remaining}초 남음)'}, namespace='/', to=request.sid)
-            return
-    
     # 기존 게임 정보 초기화 또는 신규 생성
     if user_id not in games:
         games[user_id] = {
