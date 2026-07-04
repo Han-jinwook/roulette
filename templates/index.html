@@ -1289,6 +1289,16 @@
                 overflow-y: auto !important;
             }
         }
+
+        #all-participants-scroll-track {
+            overflow-y: auto !important;
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+        #all-participants-scroll-track::-webkit-scrollbar {
+            display: none !important;
+        }
     </style>
     <link rel="icon" href="data:,">
 </head>
@@ -3347,17 +3357,8 @@
 
         // 오디오 관련 변수
         // ── 명단 무한 루프 자동스크롤 (데스크톱·모바일 공통, CSS로 뷰포트 높이만 구분) ──────────────────────────
-        function syncParticipantMarqueePauseForGameState() {
-            var inner = document.getElementById('all-participants-scroll-inner');
-            if (!inner) return;
-            var busyGame = !!gameIsActive || !!window._gameIsActive;
-            var hiddenDoc = typeof document !== 'undefined' && document.visibilityState === 'hidden';
-            if (busyGame || hiddenDoc) {
-                inner.classList.add('participant-marquee-paused');
-            } else {
-                inner.classList.remove('participant-marquee-paused');
-            }
-        }
+        var autoScrollInterval = null;
+        function syncParticipantMarqueePauseForGameState() {}
         window.syncParticipantMarqueePauseForGameState = syncParticipantMarqueePauseForGameState;
 
         function initParticipantAutoScroll() {
@@ -3365,46 +3366,60 @@
             var inner = document.getElementById('all-participants-scroll-inner');
             if (!track || !inner) return;
 
-            // 이전 클론 제거 후 애니메이션 리셋
             Array.prototype.slice.call(inner.querySelectorAll('.scroll-clone')).forEach(function (el) {
                 el.parentNode.removeChild(el);
             });
             inner.style.animation = 'none';
-            inner.style.transform = 'translateY(0)';
-
-            var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            if (reducedMotion) {
-                syncParticipantMarqueePauseForGameState();
-                return;
-            }
+            inner.style.transform = 'none';
 
             var originalItems = Array.prototype.slice.call(inner.children);
-            if (!originalItems.length) {
-                syncParticipantMarqueePauseForGameState();
+            if (!originalItems.length) return;
+
+            var originalHeight = inner.scrollHeight;
+            var trackHeight = track.clientHeight || (window.innerWidth >= 1201 ? 560 : Math.min(window.innerHeight * 0.42, 340));
+
+            if (originalHeight <= trackHeight) {
+                if (autoScrollInterval) {
+                    clearInterval(autoScrollInterval);
+                    autoScrollInterval = null;
+                }
                 return;
             }
 
-            requestAnimationFrame(function () {
-                var originalHeight = inner.scrollHeight;
-                var trackHeight = track.clientHeight || (window.innerWidth >= 1201 ? 560 : Math.min(window.innerHeight * 0.42, 340));
-
-                if (originalHeight <= trackHeight) {
-                    syncParticipantMarqueePauseForGameState();
-                    return; // 명단이 박스보다 짧으면 불필요
-                }
-
-                // 원본 복제 → seamless loop
-                originalItems.forEach(function (item) {
-                    var clone = item.cloneNode(true);
-                    clone.classList.add('scroll-clone');
-                    inner.appendChild(clone);
-                });
-
-                // 35px/s (느린 속도)
-                var duration = (originalHeight / 35).toFixed(1);
-                inner.style.animation = 'participantScrollUp ' + duration + 's linear infinite';
-                syncParticipantMarqueePauseForGameState();
+            originalItems.forEach(function (item) {
+                var clone = item.cloneNode(true);
+                clone.classList.add('scroll-clone');
+                inner.appendChild(clone);
             });
+
+            if (autoScrollInterval) clearInterval(autoScrollInterval);
+            
+            var scrollSpeed = 1;
+            autoScrollInterval = setInterval(function() {
+                var busyGame = !!gameIsActive || !!window._gameIsActive;
+                var hiddenDoc = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+                if (busyGame || hiddenDoc) {
+                    return;
+                }
+                
+                track.scrollTop += scrollSpeed;
+                
+                var loopPoint = inner.scrollHeight / 2;
+                if (track.scrollTop >= loopPoint) {
+                    track.scrollTop = track.scrollTop - loopPoint;
+                }
+            }, 30);
+
+            if (!track._scrollWrapAdded) {
+                track._scrollWrapAdded = true;
+                track.addEventListener('scroll', function() {
+                    var loopPoint = inner.scrollHeight / 2;
+                    if (loopPoint <= 0) return;
+                    if (track.scrollTop >= loopPoint) {
+                        track.scrollTop -= loopPoint;
+                    }
+                });
+            }
         }
         window.initParticipantAutoScroll = initParticipantAutoScroll;
         window.addEventListener('resize', function () {
@@ -3412,7 +3427,7 @@
             window._participantScrollResizeTimer = setTimeout(initParticipantAutoScroll, 300);
         });
         document.addEventListener('visibilitychange', function () {
-            if (typeof syncParticipantMarqueePauseForGameState === 'function') syncParticipantMarqueePauseForGameState();
+            // Handled inside interval check
         });
         // ──────────────────────────────────────────────────────────────────────
 
