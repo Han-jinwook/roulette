@@ -155,9 +155,11 @@ class CommentDatabase:
             msg = str(e).lower()
             if "does not exist" in msg and f"{table}.{column}".lower() in msg:
                 return False
-            return False
-        except Exception:
-            return False
+            print(f"DEBUG: [Supabase APIError] {e}")
+            raise
+        except Exception as e:
+            print(f"DEBUG: [Supabase Error in _column_exists] {e}")
+            raise
 
     def _detect_schema_columns(self) -> None:
         # posts: id(신규) 또는 url(레거시)
