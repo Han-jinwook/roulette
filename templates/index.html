@@ -742,6 +742,12 @@
             }
         }
 
+        @keyframes pulse-rec {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.06); opacity: 0.85; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
         #winner-overlay {
             display: none;
             position: absolute;
@@ -1314,6 +1320,11 @@
 </head>
 
 <body>
+    <!-- 🎥 실시간 자동 녹화 인디케이터 (REC) -->
+    <div id="rec-indicator" style="display:none; position:fixed; top:16px; right:20px; background:rgba(220, 20, 60, 0.92); color:white; padding:7px 15px; border-radius:20px; font-weight:bold; font-size:13px; z-index:99999; box-shadow:0 3px 12px rgba(220,20,60,0.4); animation:pulse-rec 1.5s infinite; align-items:center; gap:8px; pointer-events:none; font-family:monospace;">
+        <span style="display:inline-block; width:10px; height:10px; background:#fff; border-radius:50%; box-shadow:0 0 6px #fff;"></span>
+        <span id="rec-status-text">REC 00:00</span>
+    </div>
     <div id="roulette-loading-overlay" aria-live="polite" aria-busy="false" role="status">
         <div id="roulette-loading-card">
             <div class="spinner" aria-hidden="true"></div>
@@ -1349,6 +1360,7 @@
                 <button id="plus-45sec-button" type="button">+45초</button>
                 <button id="start-button" onclick="startRotation()">시작</button>
                 <button id="btn-auto-draw" type="button" onclick="opOpenAutoDrawModal()" style="margin-left: 8px; background-color: #673ab7; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 8px 18px; font-size: 14px; font-weight: bold;" title="설정한 대시보드 옵션대로 남은 사은품들을 연달아 자동 추첨합니다.">Auto 연속 추첨</button>
+                <button type="button" class="btn-auto-record-toggle" onclick="toggleAutoRecording()" style="margin-left: 6px; background-color: #5c6bc0; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 8px 14px; font-size: 14px; font-weight: bold;" title="클릭하여 현재 탭을 연결하면 슛 타임마다 영상이 자동 녹화 및 저장됩니다.">🎥 자동 녹화 준비</button>
                 <button id="btn-auto-pause" type="button" onclick="opToggleAutoDrawPause()" style="display:none; margin-left: 6px; background-color: #ff9800; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 8px 18px; font-size: 14px; font-weight: bold;">일시정지</button>
                 <button id="btn-auto-stop" type="button" onclick="opStopAutoDraw()" style="display:none; margin-left: 6px; background-color: #d32f2f; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 8px 18px; font-size: 14px; font-weight: bold;">연속추첨 중지</button>
             </div>
@@ -1379,7 +1391,8 @@
                         style="font-weight: bold; color: #d32f2f;">--:--:--</span>
                 </div>
                 </div>
-                <div id="guest-sound-controls">
+                <div id="guest-sound-controls" style="display: flex; align-items: center; gap: 8px;">
+                    <button type="button" class="btn-auto-record-toggle" onclick="toggleAutoRecording()" style="background-color: #5c6bc0; color: white; border: none; border-radius: 6px; padding: 6px 14px; font-size: 13px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="클릭하여 현재 탭을 연결하면 슛 타임마다 영상이 자동 녹화 및 저장됩니다.">🎥 자동 녹화 준비</button>
                     <span id="guest-sound-label">효과음 줄이기</span>
                     <input type="range" id="guest-sound-volume" min="0" max="100" step="1" value="80">
                     <span id="guest-sound-volume-value">80%</span>
@@ -4421,6 +4434,21 @@
                     }
                 }
 
+                // [🎥 자동 녹화 시작 (활성화된 경우)]
+                if (typeof window.autoRecordStart === 'function') {
+                    let currentPrizeForRecord = '';
+                    if (prizeListEl) {
+                        const prizesText = prizeListEl.dataset.prizes || '';
+                        const winnersText = prizeListEl.dataset.winners || '';
+                        const pList = splitText(prizesText);
+                        const wList = splitText(winnersText);
+                        if (pList[wList.length]) {
+                            currentPrizeForRecord = pList[wList.length];
+                        }
+                    }
+                    window.autoRecordStart(currentPrizeForRecord);
+                }
+
                 // 타겟 시간 계산 (가능하면 서버가 보낸 절대 시각 사용)
                 const targetDate = (targetUnixMs > 0)
                     ? new Date(targetUnixMs)
@@ -4607,6 +4635,11 @@
                 const winnerElement = document.getElementById('winner');
                 if (winnerElement) {
                     winnerElement.innerText = '당첨자: ' + data.winner + '님';
+                }
+
+                // [🎥 자동 녹화 종료 (당첨자 발표 및 팡파레 후 자동 저장)]
+                if (typeof window.autoRecordStop === 'function') {
+                    window.autoRecordStop(data && data.winner ? data.winner : '', 3500);
                 }
 
                 // start-button cooldown logic
@@ -5583,6 +5616,262 @@
                     .subscribe();
                 console.log('[Supabase RT] Realtime settings listener initialized');
             } catch (e) { console.error('[Supabase RT] 오류:', e); }
+        })();
+    </script>
+
+    <!-- 🎥 AutoScreenRecorder: 슛 타임 시작~당첨자 발표 자동 화면 녹화 및 비디오 파일 생성 모듈 -->
+    <script>
+        (function () {
+            var _mediaStream = null;
+            var _mediaRecorder = null;
+            var _recordedChunks = [];
+            var _isAutoRecordReady = false;
+            var _isRecording = false;
+            var _recordTimer = null;
+            var _recordSeconds = 0;
+            var _currentRecordingPrize = '';
+            var _currentRecordingWinner = '';
+            var _stopTimeout = null;
+
+            function getBestMimeType() {
+                var types = [
+                    'video/webm;codecs=vp9,opus',
+                    'video/webm;codecs=vp8,opus',
+                    'video/webm;codecs=h264,opus',
+                    'video/webm',
+                    'video/mp4'
+                ];
+                if (typeof MediaRecorder === 'undefined') return 'video/webm';
+                for (var i = 0; i < types.length; i++) {
+                    if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(types[i])) {
+                        return types[i];
+                    }
+                }
+                return 'video/webm';
+            }
+
+            function updateRecordUIState(ready) {
+                var btns = document.querySelectorAll('.btn-auto-record-toggle');
+                btns.forEach(function (btn) {
+                    if (ready) {
+                        btn.innerHTML = '🎥 자동 녹화 [ON]';
+                        btn.style.backgroundColor = '#2e7d32';
+                        btn.style.color = '#ffffff';
+                        btn.title = '자동 녹화가 활성화되어 있습니다. 클릭 시 녹화 연동을 해제합니다.';
+                    } else {
+                        btn.innerHTML = '🎥 자동 녹화 준비';
+                        btn.style.backgroundColor = '#5c6bc0';
+                        btn.style.color = '#ffffff';
+                        btn.title = '클릭하여 현재 탭을 연결하면 슛 타임마다 영상이 자동 녹화 및 저장됩니다.';
+                    }
+                });
+            }
+
+            function stopMediaStream() {
+                if (_stopTimeout) {
+                    clearTimeout(_stopTimeout);
+                    _stopTimeout = null;
+                }
+                if (_mediaRecorder && _mediaRecorder.state !== 'inactive') {
+                    try { _mediaRecorder.stop(); } catch (e) {}
+                }
+                if (_mediaStream) {
+                    try {
+                        _mediaStream.getTracks().forEach(function (track) { track.stop(); });
+                    } catch (e) {}
+                    _mediaStream = null;
+                }
+                _isAutoRecordReady = false;
+                _isRecording = false;
+                if (_recordTimer) {
+                    clearInterval(_recordTimer);
+                    _recordTimer = null;
+                }
+                var recBadge = document.getElementById('rec-indicator');
+                if (recBadge) recBadge.style.display = 'none';
+                updateRecordUIState(false);
+            }
+
+            window.toggleAutoRecording = async function () {
+                if (_isAutoRecordReady && _mediaStream) {
+                    stopMediaStream();
+                    if (typeof showStartToast === 'function') {
+                        showStartToast('🎥 자동 녹화 연동이 해제되었습니다.');
+                    }
+                    return;
+                }
+
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                    alert('현재 브라우저에서는 화면 녹화 기능을 지원하지 않습니다. 데스크톱 크롬(Chrome) 브라우저를 사용해 주세요.');
+                    return;
+                }
+
+                try {
+                    var stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            displaySurface: 'browser',
+                            frameRate: { ideal: 30, max: 60 }
+                        },
+                        audio: {
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        },
+                        preferCurrentTab: true,
+                        selfBrowserSurface: 'include',
+                        systemAudio: 'include'
+                    });
+
+                    _mediaStream = stream;
+                    _isAutoRecordReady = true;
+
+                    var videoTrack = stream.getVideoTracks()[0];
+                    if (videoTrack) {
+                        videoTrack.onended = function () {
+                            stopMediaStream();
+                            if (typeof showStartToast === 'function') {
+                                showStartToast('🎥 브라우저 공유가 중지되어 자동 녹화가 해제되었습니다.');
+                            }
+                        };
+                    }
+
+                    updateRecordUIState(true);
+                    if (typeof showStartToast === 'function') {
+                        showStartToast('🎥 자동 녹화 준비 완료! 슛 타임 시작 시 자동으로 녹화가 시작됩니다.');
+                    }
+                    console.log('🎥 [AutoRecord] 탭 스트림 연결 완료');
+                } catch (err) {
+                    console.log('🎥 [AutoRecord] 스트림 연결 취소 또는 실패:', err);
+                    updateRecordUIState(false);
+                }
+            };
+
+            window.autoRecordStart = function (prizeName) {
+                if (!_isAutoRecordReady || !_mediaStream || _isRecording) return;
+
+                try {
+                    var activeTracks = _mediaStream.getVideoTracks().filter(function (t) { return t.readyState === 'live'; });
+                    if (activeTracks.length === 0) {
+                        stopMediaStream();
+                        return;
+                    }
+
+                    _recordedChunks = [];
+                    _currentRecordingPrize = prizeName || '사은품';
+                    _currentRecordingWinner = '';
+
+                    var mimeType = getBestMimeType();
+                    _mediaRecorder = new MediaRecorder(_mediaStream, {
+                        mimeType: mimeType,
+                        videoBitsPerSecond: 2500000
+                    });
+
+                    _mediaRecorder.ondataavailable = function (e) {
+                        if (e.data && e.data.size > 0) {
+                            _recordedChunks.push(e.data);
+                        }
+                    };
+
+                    _mediaRecorder.onstop = function () {
+                        saveRecordedFile();
+                    };
+
+                    _mediaRecorder.start(500);
+                    _isRecording = true;
+
+                    _recordSeconds = 0;
+                    var recBadge = document.getElementById('rec-indicator');
+                    var recText = document.getElementById('rec-status-text');
+                    if (recBadge) recBadge.style.display = 'flex';
+                    if (recText) recText.innerText = 'REC 00:00';
+
+                    if (_recordTimer) clearInterval(_recordTimer);
+                    _recordTimer = setInterval(function () {
+                        _recordSeconds++;
+                        var mm = String(Math.floor(_recordSeconds / 60)).padStart(2, '0');
+                        var ss = String(_recordSeconds % 60).padStart(2, '0');
+                        if (recText) recText.innerText = 'REC ' + mm + ':' + ss;
+                    }, 1000);
+
+                    console.log('🎥 [AutoRecord] 룰렛 회전 자동 녹화 시작 (사은품: ' + _currentRecordingPrize + ')');
+                } catch (err) {
+                    console.error('🎥 [AutoRecord] 녹화 시작 실패:', err);
+                }
+            };
+
+            window.autoRecordStop = function (winnerName, delayMs) {
+                if (!_isRecording || !_mediaRecorder) return;
+
+                if (winnerName) {
+                    _currentRecordingWinner = winnerName;
+                }
+
+                var waitTime = (typeof delayMs === 'number') ? delayMs : 3500;
+
+                if (_stopTimeout) clearTimeout(_stopTimeout);
+                _stopTimeout = setTimeout(function () {
+                    if (!_isRecording || !_mediaRecorder) return;
+                    try {
+                        if (_mediaRecorder.state !== 'inactive') {
+                            _mediaRecorder.stop();
+                        }
+                    } catch (e) {
+                        console.error('🎥 [AutoRecord] stop error:', e);
+                    }
+                    _isRecording = false;
+                    if (_recordTimer) {
+                        clearInterval(_recordTimer);
+                        _recordTimer = null;
+                    }
+                    var recBadge = document.getElementById('rec-indicator');
+                    if (recBadge) recBadge.style.display = 'none';
+                    console.log('🎥 [AutoRecord] 룰렛 녹화 완료 및 파일 생성 대기');
+                }, waitTime);
+            };
+
+            function saveRecordedFile() {
+                if (_recordedChunks.length === 0) return;
+
+                try {
+                    var mimeType = getBestMimeType();
+                    var blob = new Blob(_recordedChunks, { type: mimeType });
+                    var url = URL.createObjectURL(blob);
+
+                    var now = new Date();
+                    var yyyy = now.getFullYear();
+                    var mm = String(now.getMonth() + 1).padStart(2, '0');
+                    var dd = String(now.getDate()).padStart(2, '0');
+                    var hh = String(now.getHours()).padStart(2, '0');
+                    var min = String(now.getMinutes()).padStart(2, '0');
+                    var sec = String(now.getSeconds()).padStart(2, '0');
+                    var dateStr = yyyy + mm + dd + '_' + hh + min + sec;
+
+                    var safePrize = (_currentRecordingPrize || '추첨').replace(/[/\\?%*:|"<>]/g, '_').trim();
+                    var safeWinner = (_currentRecordingWinner || '당첨자').replace(/[/\\?%*:|"<>]/g, '_').trim();
+                    var ext = mimeType.indexOf('mp4') !== -1 ? 'mp4' : 'webm';
+                    var filename = '[룰렛당첨]_' + safePrize + '_' + safeWinner + '_' + dateStr + '.' + ext;
+
+                    var a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+
+                    setTimeout(function () {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                        _recordedChunks = [];
+                    }, 2000);
+
+                    console.log('🎥 [AutoRecord] 비디오 파일 자동 다운로드 완료:', filename);
+                    if (typeof showStartToast === 'function') {
+                        showStartToast('🎥 [녹화완료] ' + filename + ' 다운로드 완료!');
+                    }
+                } catch (err) {
+                    console.error('🎥 [AutoRecord] 파일 다운로드 오류:', err);
+                }
+            }
         })();
     </script>
     <!-- 사용 가이드 모달 -->
